@@ -1,0 +1,429 @@
+<?xml version="1.0" ?>
+<!-- Generated using onshape-to-robot -->
+<!-- Onshape https://cad.onshape.com/documents/39d48276447cd48c86498015/w/39b3d8215a40ceebd5846695/e/a41b11f439c5da9336695592 -->
+<robot name="droid">
+  <!-- Link base_link -->
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="1e-09"/>
+      <inertia ixx="1e-09" ixy="0" ixz="0" iyy="1e-09" iyz="0" izz="1e-09"/>
+    </inertial>
+  </link>
+  <!-- Link body -->
+  <link name="body">
+    <inertial>
+      <origin xyz="0 -0 0.00260792" rpy="0 0 0"/>
+      <mass value="0.0199018"/>
+      <inertia ixx="6.11183e-06" ixy="0" ixz="0" iyy="3.7272e-06" iyz="0" izz="9.7415e-06"/>
+    </inertial>
+    <!-- Part body -->
+    <visual>
+      <origin xyz="0.0202915 -0 0" rpy="0 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/body.stl"/>
+      </geometry>
+      <material name="body_material">
+        <color rgba="0.952941 0.894118 0.788235 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0202915 -0 0" rpy="0 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/body.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link base_arm -->
+  <link name="base_arm">
+    <inertial>
+      <origin xyz="0 -0.000821445 -0.00846774" rpy="0 0 0"/>
+      <mass value="0.00126809"/>
+      <inertia ixx="4.8105e-08" ixy="0" ixz="-0" iyy="4.813e-08" iyz="-2.117e-09" izz="1.4267e-08"/>
+    </inertial>
+    <!-- Part base_arm -->
+    <visual>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+      <material name="base_arm_material">
+        <color rgba="1 0.772549 0.439216 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link first_leg_1 -->
+  <link name="first_leg_1">
+    <inertial>
+      <origin xyz="1.1904e-08 -0.0271462 0.00315744" rpy="0 0 0"/>
+      <mass value="0.00278753"/>
+      <inertia ixx="7.46524e-07" ixy="0" ixz="0" iyy="2.4267e-08" iyz="1.1974e-08" izz="7.56242e-07"/>
+    </inertial>
+    <!-- Part arm1 -->
+    <visual>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+      <material name="arm1_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link second_leg_1 -->
+  <link name="second_leg_1">
+    <inertial>
+      <origin xyz="-1.008e-09 -0.0291753 0.00350177" rpy="0 0 0"/>
+      <mass value="0.00307395"/>
+      <inertia ixx="8.76015e-07" ixy="0" ixz="-0" iyy="3.0359e-08" iyz="3.2666e-08" izz="8.83959e-07"/>
+    </inertial>
+    <!-- Part arm2 -->
+    <visual>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+      <material name="arm2_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from first_leg_1 to second_leg_1 -->
+  <joint name="second_leg_1" type="revolute">
+    <origin xyz="-0 -0.05 0.010036" rpy="-3.14159 0 -1.39626"/>
+    <parent link="first_leg_1"/>
+    <child link="second_leg_1"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.13446" upper="1.5708"/>
+  </joint>
+  <!-- Joint from base_arm to first_leg_1 -->
+  <joint name="first_leg_1" type="revolute">
+    <origin xyz="0 0.005 -0.015" rpy="1.5708 -0.959931 -0"/>
+    <parent link="base_arm"/>
+    <child link="first_leg_1"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.785398" upper="1.22173"/>
+  </joint>
+  <!-- Joint from body to base_arm -->
+  <joint name="base_leg_1" type="revolute">
+    <origin xyz="-0.015 -0.0225 0.0025" rpy="-3.14159 -0 -2.35619"/>
+    <parent link="body"/>
+    <child link="base_arm"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5707963268" upper="1.5707963268"/>
+  </joint>
+  <!-- Link base_arm_2 -->
+  <link name="base_arm_2">
+    <inertial>
+      <origin xyz="0 -0.000821445 -0.00846774" rpy="0 0 0"/>
+      <mass value="0.00126809"/>
+      <inertia ixx="4.8105e-08" ixy="-0" ixz="0" iyy="4.813e-08" iyz="-2.117e-09" izz="1.4267e-08"/>
+    </inertial>
+    <!-- Part base_arm_2 -->
+    <visual>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="-3.14159 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+      <material name="base_arm_2_material">
+        <color rgba="1 0.772549 0.439216 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="-3.14159 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link first_leg_2 -->
+  <link name="first_leg_2">
+    <inertial>
+      <origin xyz="1.1904e-08 -0.0271462 0.00315744" rpy="0 0 0"/>
+      <mass value="0.00278753"/>
+      <inertia ixx="7.46524e-07" ixy="0" ixz="0" iyy="2.4267e-08" iyz="1.1974e-08" izz="7.56242e-07"/>
+    </inertial>
+    <!-- Part arm1_2 -->
+    <visual>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+      <material name="arm1_2_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link second_leg_2 -->
+  <link name="second_leg_2">
+    <inertial>
+      <origin xyz="-1.008e-09 -0.0291753 0.00350177" rpy="0 0 0"/>
+      <mass value="0.00307395"/>
+      <inertia ixx="8.76015e-07" ixy="0" ixz="-0" iyy="3.0359e-08" iyz="3.2666e-08" izz="8.83959e-07"/>
+    </inertial>
+    <!-- Part arm2_2 -->
+    <visual>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+      <material name="arm2_2_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from first_leg_2 to second_leg_2 -->
+  <joint name="second_leg_2" type="revolute">
+    <origin xyz="-0 -0.05 0.010036" rpy="-3.14159 0 -1.39626"/>
+    <parent link="first_leg_2"/>
+    <child link="second_leg_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.13446" upper="1.5708"/>
+  </joint>
+  <!-- Joint from base_arm_2 to first_leg_2 -->
+  <joint name="first_leg_2" type="revolute">
+    <origin xyz="0 0.005 -0.015" rpy="1.5708 -0.959931 -0"/>
+    <parent link="base_arm_2"/>
+    <child link="first_leg_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.785398" upper="1.22173"/>
+  </joint>
+  <!-- Joint from body to base_arm_2 -->
+  <joint name="base_leg_2" type="revolute">
+    <origin xyz="-0.015 0.0225 0.0025" rpy="-3.14159 -0 2.35619"/>
+    <parent link="body"/>
+    <child link="base_arm_2"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+  <!-- Link base_arm_3 -->
+  <link name="base_arm_3">
+    <inertial>
+      <origin xyz="0 -0.000821445 -0.00846774" rpy="0 0 0"/>
+      <mass value="0.00126809"/>
+      <inertia ixx="4.8105e-08" ixy="0" ixz="-0" iyy="4.813e-08" iyz="-2.117e-09" izz="1.4267e-08"/>
+    </inertial>
+    <!-- Part base_arm_3 -->
+    <visual>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+      <material name="base_arm_3_material">
+        <color rgba="1 0.772549 0.439216 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link first_leg_3 -->
+  <link name="first_leg_3">
+    <inertial>
+      <origin xyz="1.1904e-08 -0.0271462 0.00315744" rpy="0 0 0"/>
+      <mass value="0.00278753"/>
+      <inertia ixx="7.46524e-07" ixy="0" ixz="0" iyy="2.4267e-08" iyz="1.1974e-08" izz="7.56242e-07"/>
+    </inertial>
+    <!-- Part arm1_3 -->
+    <visual>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+      <material name="arm1_3_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link second_leg_3 -->
+  <link name="second_leg_3">
+    <inertial>
+      <origin xyz="-1.008e-09 -0.0291753 0.00350177" rpy="0 0 0"/>
+      <mass value="0.00307395"/>
+      <inertia ixx="8.76015e-07" ixy="0" ixz="-0" iyy="3.0359e-08" iyz="3.2666e-08" izz="8.83959e-07"/>
+    </inertial>
+    <!-- Part arm2_3 -->
+    <visual>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+      <material name="arm2_3_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from first_leg_3 to second_leg_3 -->
+  <joint name="second_leg_3" type="revolute">
+    <origin xyz="-0 -0.05 0.010036" rpy="3.14159 -0 -1.07492"/>
+    <parent link="first_leg_3"/>
+    <child link="second_leg_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.813125" upper="1.89214"/>
+  </joint>
+  <!-- Joint from base_arm_3 to first_leg_3 -->
+  <joint name="first_leg_3" type="revolute">
+    <origin xyz="0 0.005 -0.015" rpy="1.5708 -0.959931 -0"/>
+    <parent link="base_arm_3"/>
+    <child link="first_leg_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.785398" upper="1.22173"/>
+  </joint>
+  <!-- Joint from body to base_arm_3 -->
+  <joint name="base_leg_3" type="revolute">
+    <origin xyz="0.015 0.0225 0.0025" rpy="-3.14159 -0 0.785398"/>
+    <parent link="body"/>
+    <child link="base_arm_3"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+  <!-- Link base_arm_4 -->
+  <link name="base_arm_4">
+    <inertial>
+      <origin xyz="0 -0.000821445 -0.00846774" rpy="0 0 0"/>
+      <mass value="0.00126809"/>
+      <inertia ixx="4.8105e-08" ixy="0" ixz="-0" iyy="4.813e-08" iyz="-2.117e-09" izz="1.4267e-08"/>
+    </inertial>
+    <!-- Part base_arm_4 -->
+    <visual>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+      <material name="base_arm_4_material">
+        <color rgba="1 0.772549 0.439216 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.00227465 0" rpy="3.14159 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/base_arm.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link first_leg_4 -->
+  <link name="first_leg_4">
+    <inertial>
+      <origin xyz="1.1904e-08 -0.0271462 0.00315744" rpy="0 0 0"/>
+      <mass value="0.00278753"/>
+      <inertia ixx="7.46524e-07" ixy="0" ixz="0" iyy="2.4267e-08" iyz="1.1974e-08" izz="7.56242e-07"/>
+    </inertial>
+    <!-- Part arm1_4 -->
+    <visual>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+      <material name="arm1_4_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm1.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Link second_leg_4 -->
+  <link name="second_leg_4">
+    <inertial>
+      <origin xyz="-1.008e-09 -0.0291753 0.00350177" rpy="0 0 0"/>
+      <mass value="0.00307395"/>
+      <inertia ixx="8.76015e-07" ixy="0" ixz="-0" iyy="3.0359e-08" iyz="3.2666e-08" izz="8.83959e-07"/>
+    </inertial>
+    <!-- Part arm2_4 -->
+    <visual>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+      <material name="arm2_4_material">
+        <color rgba="0.662745 0.545098 0.462745 1"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.0411943 -0.065 0.00276138" rpy="-1.5708 0 -0"/>
+      <geometry>
+        <mesh filename="package://speeder_description/assets/arm2.stl"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Joint from first_leg_4 to second_leg_4 -->
+  <joint name="second_leg_4" type="revolute">
+    <origin xyz="-0 -0.05 0.010036" rpy="-3.14159 0 -1.39626"/>
+    <parent link="first_leg_4"/>
+    <child link="second_leg_4"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.13446" upper="1.5708"/>
+  </joint>
+  <!-- Joint from base_arm_4 to first_leg_4 -->
+  <joint name="first_leg_4" type="revolute">
+    <origin xyz="0 0.005 -0.015" rpy="1.5708 -0.959931 -0"/>
+    <parent link="base_arm_4"/>
+    <child link="first_leg_4"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-0.785398" upper="1.22173"/>
+  </joint>
+  <!-- Joint from body to base_arm_4 -->
+  <joint name="base_leg_4" type="revolute">
+    <origin xyz="0.015 -0.0225 0.0025" rpy="3.14159 -0 -0.785398"/>
+    <parent link="body"/>
+    <child link="base_arm_4"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+  </joint>
+  <!-- Joint from base_link to body -->
+  <joint name="base_link_to_body" type="fixed">
+    <origin xyz="0 0 0" rpy="0 -0 0"/>
+    <parent link="base_link"/>
+    <child link="body"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10" velocity="10"/>
+  </joint>
+</robot>

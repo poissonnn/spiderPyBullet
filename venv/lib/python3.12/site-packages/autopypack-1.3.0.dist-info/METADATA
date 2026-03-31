@@ -1,0 +1,172 @@
+Metadata-Version: 2.4
+Name: autopypack
+Version: 1.3.0
+Summary: Automatically installs missing Python libraries when running your code.
+Home-page: https://github.com/harshRaj1601/AutoPyPack
+Author: Harsh Jaiswal
+Author-email: Harsh Jaiswal <harshrajjaiswal16012003@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/harshRaj1601/AutoPyPack
+Project-URL: Repository, https://github.com/harshRaj1601/AutoPyPack
+Project-URL: Issues, https://github.com/harshRaj1601/AutoPyPack/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: ipython>=7.0.0
+Requires-Dist: setuptools
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Dynamic: author
+Dynamic: home-page
+Dynamic: requires-python
+
+# AutoPyPack
+
+**AutoPyPack** is a zero-config tool that automatically installs missing Python packages in your project — whether you're running a script, a notebook, or from the command line.
+
+> ✨ Works as both a CLI tool, an importable module, and supports magic commands inside Jupyter notebooks.
+
+---
+
+## 🚀 Features
+
+- 📦 Automatically installs missing packages from `import` statements
+- 🧠 Smart mapping from import names to PyPI package names
+- 🛠️ Use it via CLI, Python, or inside **Jupyter notebooks** with `%%autopypack` magic
+- 🔍 Detects local modules and standard libraries — no false installs
+- 🧪 Includes dev tools for testing and linting
+
+---
+
+## 📦 Installation
+
+Install from PyPI:
+
+```bash
+pip install autopypack
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/harshRaj1601/AutoPyPack
+cd AutoPyPack
+pip install -e .
+```
+
+---
+
+## 🧠 Usage
+
+### ✅ Method 1: As an importable module (auto-scans your script)
+
+```python
+import AutoPyPack  # 👈 Automatically scans and installs packages
+
+# Your usual imports
+import numpy as np
+import pandas as pd
+```
+
+#### Manual usage
+
+```python
+import AutoPyPack
+
+AutoPyPack.install()                        # Scan current directory
+AutoPyPack.install("/path/to/project")      # Scan specific directory
+AutoPyPack.scan_file("example.py")          # Scan a specific file
+```
+
+---
+
+### 🧪 Method 2: Inside a Jupyter Notebook
+
+Enable magic with a single import:
+
+```python
+import AutoPyPack
+```
+
+Use it in a cell:
+
+```python
+%%autopypack
+import pandas as pd
+import sklearn
+print("All imported successfully!")
+```
+
+✨ AutoPyPack will:
+- Detect missing packages in that cell
+- Install them with pip
+- Execute the cell code
+
+---
+
+### 🖥️ Method 3: As a CLI tool
+
+#### Install missing packages in your project
+
+```bash
+autopypack install
+autopypack i  # Short form
+```
+
+#### List all external packages
+
+```bash
+autopypack list
+autopypack l  # Short form
+```
+
+#### Options
+
+- `--dir`, `-d`: Target a specific directory (default: `.`)
+- `--quiet`, `-q`: Suppress detailed logs (useful for scripts)
+
+#### Example: generate `requirements.txt`
+
+```bash
+autopypack list --quiet > requirements.txt
+```
+
+---
+
+## ⚙️ How it works
+
+1. Scans `.py` or notebook cell for `import` statements
+2. Identifies unique modules
+3. Uses `mappings.json` to resolve correct package names
+4. Installs anything missing via `pip`
+5. Skips local modules and stdlib
+
+---
+
+
+## 🪪 License
+
+MIT © Harsh Jaiswal
+
+---
+
+## 🔗 Links
+
+- GitHub: [AutoPyPack](https://github.com/harshRaj1601/AutoPyPack)
+MIT
+
+[![PyPI Downloads](https://static.pepy.tech/badge/autopypack)](https://pepy.tech/projects/autopypack)
