@@ -82,10 +82,38 @@ len_joint_ids = len(joint_ids)
 target = [position] * len_joint_ids
 
 def reload():
+    p.resetBasePositionAndOrientation(spider , [ 0 , 0 , 0.15 ] , [ 0 , 0 , 0 , 1 ])
+
+    p.resetBaseVelocity(spider, [0, 0, 0], [0, 0, 0])
+    
+    p.setJointMotorControlArray(
+    spider,
+    joint_ids,
+    controlMode=p.VELOCITY_CONTROL,
+    forces=[0]*len_joint_ids
+    )
+    
+    for i in range(p.getNumJoints(spider)):
+        p.resetJointState(spider, i, targetValue=0, targetVelocity=0)
+
     for i in range(len_joint_ids):
         target[i] = 0 # radian
+    """
+    for _ in range(50):
+        p.stepSimulation()
+
+    """
+    p.setJointMotorControlArray(
+        spider,
+        joint_ids,
+        p.POSITION_CONTROL,
+        targetPositions=target
+    )
+
+
+
     
-    p.resetBasePositionAndOrientation(spider , [ 0 , 0 , 0.14 ] , [ 0 , 0 , 0 , 1 ])
+    
 
 
 # --- PPO ---
@@ -100,23 +128,23 @@ lmbda = 0.95
 entropy_eps = 1e-3
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim = 32):
+    def __init__(self, state_dim, action_dim, hidden_dim = 64):
         super().__init__()
 
         # X depends on the state_dim and actio_dim
-
-        # X input -> 32 hidden neurone -> 16 hidden neurone -> 16 hidden neurone
+        # X = 32
+        # X input -> 64 hidden neurone -> 64 hidden neurone -> 32 hidden neurone
         # this is a common part and divided to actor and to critic
         self.shared_layers = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim // 2 ),
+            nn.Linear(hidden_dim, hidden_dim ),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 2, hidden_dim // 2 ),
+            nn.Linear(hidden_dim, hidden_dim // 2 ),
             nn.ReLU()
         )
 
-        # 16 hidden neurone -> 8 hidden neurone -> X probability with the softmax
+        # 32 hidden neurone -> 16 hidden neurone -> X probability with the softmax
         self.actor = nn.Sequential(
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
@@ -124,7 +152,7 @@ class ActorCritic(nn.Module):
             nn.Softmax(dim=-1)
         )
 
-        # 16 hidden neurone -> 8 hidden neurone -> 1 estimation of how many point the future ia can win
+        # 32 hidden neurone -> 16 hidden neurone -> 1 estimation of how many point the future ia can win
         self.critic = nn.Sequential(
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
@@ -158,15 +186,46 @@ class buffer:
 
         return mini_batch
 
-def observe():
+def observe(spider):
 
+    spiderPosition, spiderOrientation = p.getBasePositionAndOrientation(spider)
+    linearVelocity, _ = p.getBaseVelocity(spider)
 
-    state = [
+    state = [spiderPosition[0], spiderPosition[1], spiderPosition[2],
+            linearVelocity[0], linearVelocity[1], linearVelocity[2],
 
             ]
 
 
+    """
+    for i in range(p.getNumJoints(spider)):
+        print(p.getJointInfo(spider,i)[3])
+    """
+    # [1] position | [0] velocity
+    for i in range(p.getNumJoints(spider)):
+        
+       state.append(p.getJointState(spider,i)[0]) 
+       state.append(p.getJointState(spider,i)[1]) 
+
+    #roundState = [ '%.2f' % elem for elem in state]
+    #print(len(state))
+
     return np.array(state, dtype=np.float32)
+
+a = []
+
+def apply_action(action):
+
+    action +=1
+
+    # 0 -> 23
+    if action > 12:
+        action -= 12
+        target[action] -= stepMouvement   
+    
+    else :
+        target[action] += stepMouvement   
+    #print(action)
 
 #take subdata and extract info 
 def extract_data_buffer(subdata, dataNumber):
@@ -176,9 +235,19 @@ def extract_data_buffer(subdata, dataNumber):
 
         return data
  
-def compute_reward(done):
+def compute_reward(next_state):
 
-    reward = 0
+    reward = next_state[1]
+
+    #reward *= next_state[4]
+
+    print(reward)
+
+    done = False
+
+    if next_state[1] > 3:
+        done = True
+        reward += 10
 
     return reward, done
 
@@ -268,7 +337,7 @@ def PPO_loss(subdata, advantages, model1):
 
 def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
     D_buffer = buffer()
-
+    reload()
     graphReward = []
     episodeLength = []
     optimizer = optim.Adam(model1.parameters(), lr=lr)
@@ -276,26 +345,28 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
     count_frame = 0
     count_max_training_frames = 0
 
-    for i in range (frames_per_batch):    
+    for i in range (frames_per_batch):   
+         
 
         keys = p.getKeyboardEvents()
-        if ord('s') in keys:
+        if ord('c') in keys:
             print('save')
             break
     
         if ord('x') in keys:
             reload()
 
-        # take info
-        Data = observe()          # data = state = s
-
         if count_max_training_frames >= max_training_frames:
-
             episodeLength.append(count_max_training_frames)
-
             count_max_training_frames = 0
+            reload()
+            D_buffer.clear_buffer()
             print(f"Over {max_training_frames} frames : reset")
-        
+
+
+        # take info
+        Data = observe(spider)          # data = state = s
+
         # put in tensor for the model
         state_tensor = torch.tensor(Data, dtype=torch.float32)
 
@@ -306,6 +377,9 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
         # choose randomly one action while taking the probability
         action_dist = torch.distributions.Categorical(action_probs)
         action = action_dist.sample().item()        # action = a
+
+        #actiona=0
+        apply_action(action)
 
         # clip all the joint depending of their joint types
         for i in range(len_joint_ids):
@@ -327,24 +401,25 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
         
         focus_position , _ = p.getBasePositionAndOrientation(spider)
             
-        p.resetDebugVisualizerCamera(cameraDistance=4,
-                                    cameraYaw=0,
+        p.resetDebugVisualizerCamera(cameraDistance=7,
+                                    cameraYaw=90,
                                     cameraPitch=-40,
                                     cameraTargetPosition = focus_position)
 
         p.stepSimulation()
-        time.sleep(1./240.)
+        #time.sleep(1./240.)
         # --- after action ---
 
         # use later for the ppo 
         #(to know at which point the policy what thinking if it was right)
         log_prob = action_dist.log_prob(torch.tensor(action, dtype=torch.int64)).item()
 
-        next_state = observe()      # next_state = s'
-
-        distance2 = compute_distance(next_state)
+        next_state = observe(spider)      # next_state = s'
         
-        reward, done = compute_reward()     # reward = r
+        reward, done = compute_reward(next_state)     # reward = r
+        
+        #done = 0
+        #reward = 0
 
         graphReward.append(reward)
 
@@ -400,45 +475,161 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
 
         #p.stepSimulation()
         #time.sleep(1./240.)
-    visual.tensorGraphic(graphReward, episodeLength)
+    visual.tensorGraphic(graphReward,episodeLength)
+
+
+
+def DEBUG():
+
+    while True:
+
+        observe(spider)
+
+        keys = p.getKeyboardEvents()
+        
+        if ord('c') in keys:
+            p.disconnect()
+
+        if ord('x') in keys:
+            reload()
+
+        if ord('e') in keys :
+            target[12] += stepMouvement      
+
+        if ord('d') in keys :
+            target[12] -= stepMouvement     
+
+        # clip all the joint depending of their joint types
+        for i in range(len_joint_ids):
+
+            if i in joint_ids_base_legs:
+                target[i] = min(max(target[i], clip_base_legs[0]) , clip_base_legs[1])
+
+            elif i in joint_ids_first_legs:
+                target[i] = min(max(target[i], clip_first_legs[0]) , clip_first_legs[1])
+
+            elif i in joint_ids_second_legs:
+                target[i] = min(max(target[i], clip_second_legs[0]) , clip_second_legs[1])
+     
+     
+        # update the joint position
+        p.setJointMotorControlArray(spider,
+                                    joint_ids,
+                                    p.POSITION_CONTROL,
+                                    target)
+            
+            
+        focus_position , _ = p.getBasePositionAndOrientation(spider)
+            
+        p.resetDebugVisualizerCamera(cameraDistance=4,
+                                    cameraYaw=0,
+                                    cameraPitch=-60,
+                                    cameraTargetPosition = focus_position)
+
+        p.stepSimulation()
+        time.sleep(1./240.)
+
+
+
 
 path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
 
 if not os.path.exists(path):
     os.makedirs(path)
 
+focus_position , _ = p.getBasePositionAndOrientation(spider)
+    
+p.resetDebugVisualizerCamera(cameraDistance=4,
+                            cameraYaw=0,
+                            cameraPitch=-40,
+                            cameraTargetPosition = focus_position)
+
+
+
+model1 = ActorCritic(state_dim=32, action_dim=24)
 
 while True:
-    keys = p.getKeyboardEvents()
+    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3]")
     
-    if ord('x') in keys:
-        reload()
+    choice = input().strip()
 
-    # clip all the joint depending of their joint types
-    for i in range(len_joint_ids):
+    if not choice.isdigit():
+        print("Invalid input")
+        continue
 
-        if i in joint_ids_base_legs:
-            target[i] = min(max(target[i], clip_base_legs[0]) , clip_base_legs[1])
 
-        elif i in joint_ids_first_legs:
-            target[i] = min(max(target[i], clip_first_legs[0]) , clip_first_legs[1])
-
-        elif i in joint_ids_second_legs:
-            target[i] = min(max(target[i], clip_second_legs[0]) , clip_second_legs[1])
-    # update the joint position
-    p.setJointMotorControlArray(spider,
-                                joint_ids,
-                                p.POSITION_CONTROL,
-                                target)
+    QuestionAction = int(choice)
     
-    
-    focus_position , _ = p.getBasePositionAndOrientation(spider)
+    #QuestionAction = 5
+
+    #exit
+    if QuestionAction == 0:
+        break
+
+    # train
+    elif QuestionAction == 1:
+
+        print("\nGo for training")
+        print("Number of frames per batch [default = 122880] :")
+        choice = input()
+        if choice.isdigit():
+            frames_per_batch = int(choice)
+        else:
+            frames_per_batch = 122880
+
+        print("Number of frames per sub batch [default = 128] :")
+        choice = input()
+        if choice.isdigit():
+            sub_batch_size = int(choice)
+        else:
+            sub_batch_size = 128
+
+        print("Max frames per episode [default = 4096] :")
+        choice = input()
+        if choice.isdigit():
+            max_training_frames = int(choice)
+        else:
+            max_training_frames = 4096
         
-    p.resetDebugVisualizerCamera(cameraDistance=4,
-                                cameraYaw=0,
-                                cameraPitch=-40,
-                                cameraTargetPosition = focus_position)
+
+        print(f"training model with {frames_per_batch} frames per batch ")
+        print(f"training model with {sub_batch_size} frames per sub batch ")
+        print(f"training model with {max_training_frames} max frames per episode")
+
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames)
 
 
-    p.stepSimulation()
-    time.sleep(1./240.)
+        print("Do you want to save the model : yes [1] | no [2] ")
+        choiceSave = input().strip()
+        Save = int(choiceSave)
+
+        if Save == 2:
+            print("model not saved :(")
+        else:
+            print("Choose model name :")
+            MODEL_NAME = input()
+            MODEL_NAME += ".pth"
+            MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+
+            torch.save(model1.state_dict(), MODEL_SAVE_PATH)
+            print(f"save model : {MODEL_SAVE_PATH}")
+    
+    # load
+    elif QuestionAction == 2:
+        print("Choose model name :")
+
+        MODEL_NAME = input()
+        MODEL_NAME += ".pth"
+        MODEL_LOAD_PATH = os.path.join(path, MODEL_NAME)
+
+        model1.load_state_dict(torch.load(MODEL_LOAD_PATH))
+        model1.eval()
+        print("Model loaded successfully!")
+
+
+    elif QuestionAction == 3:
+        print("DEBUG")
+        DEBUG()
+
+    
+p.disconnect()
