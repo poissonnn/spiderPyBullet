@@ -10,7 +10,7 @@ true_black  = [0.1,0.1,0.1]
 gray        = [150/255, 150/255, 150/255]
 white       = [1, 1, 1]
 
-Size = 14,7
+Size = (14,7)
 
 def tensorGraphic(reward, episodeLength):
     print("graph")
@@ -24,6 +24,25 @@ def tensorGraphic(reward, episodeLength):
     axs[1].plot(episodeLength, color = red_light)
 
     plt.savefig("training.png")
+
+def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
+    print("graph")
+
+    fig, axs = plt.subplots(2,2,figsize=(Size))
+
+    axs[0][0].set_title("Reward")
+    axs[0][0].plot(reward, color = green_light)
+
+    axs[0][1].set_title("Reward on 1/4 step")
+    axs[0][1].plot(rewardSpe, color = orange)
+    
+    axs[1][1].set_title("EpisodeLength")
+    axs[1][1].plot(episodeLength, color = red_light)
+
+
+
+    plt.savefig("training.png")
+
 
 a = []
 x = []

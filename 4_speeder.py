@@ -25,20 +25,120 @@ def radian(x):
 
 # --- PYBULLET ---
 
-# p.GUI or p.DIRECT for non-graphical version
-physicsClient = p.connect(p.GUI)
-p.setGravity(0,0,-9.81)
+class Env():
+    def __init__(self):
+        self.step_count = 0
+        self.position = 0.0
+        self.stepMouvement = 0.01
 
-# charger les fichiers de base
-p.setAdditionalSearchPath(pybullet_data.getDataPath()) #not mandatory
+        self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
+        self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
+        self.joint_ids_second_legs = [3, 6, 9, 12] # -65 // 90 | -1.1344 // 1.5708
 
-urdf_folder = r"/home/fish/FISH/prod/code/python/PyBullet/urdf/speeder_description/robot.urdf"
-planeId = p.loadURDF("plane.urdf" , [ 0 , 0 , 0 ] , [ 0 , 0 , 0 , 1 ] ) #charger le sol
+        self.clip_base_legs =   [-1.5708 , 1.5708]
+        self.clip_first_legs =  [-0.7853 , 1.2217]
+        self.clip_second_legs = [-1.1344 , 1.5708]
 
-sizeFactor = 20
-#spider = p.loadURDF(urdf_folder, [ 0 , 0 , 0 ] , [ 0 , 0 , 0 , 1 ] , globalScaling=sizeFactor , useFixedBase = True)
-spider = p.loadURDF(urdf_folder, [ 0 , 0 , 0.14 ] , [ 0 , 0 , 0 , 1 ] , globalScaling=sizeFactor)
-obj_of_focus = spider
+        self.joint_ids = [0,1,2,3,4,5,6,7,8,9,10,11,12]
+
+        self.len_joint_ids = len(self.joint_ids)
+        self.target = [self.position] * self.len_joint_ids
+
+        self.state = self.build_env()
+
+    def build_env(self):
+        # p.GUI or p.DIRECT for non-graphical version
+        physicsClient = p.connect(p.GUI)
+        p.setGravity(0,0,-9.81)
+
+        # charger les fichiers de base
+        p.setAdditionalSearchPath(pybullet_data.getDataPath()) #not mandatory
+
+        urdf_folder = r"/home/fish/FISH/prod/code/python/PyBullet/urdf/speeder_description/robot.urdf"
+        planeId = p.loadURDF("plane.urdf" , [ 0 , 0 , 0 ] , [ 0 , 0 , 0 , 1 ] ) #charger le sol
+
+        sizeFactor = 20
+        #spider = p.loadURDF(urdf_folder, [ 0 , 0 , 0 ] , [ 0 , 0 , 0 , 1 ] , globalScaling=sizeFactor , useFixedBase = True)
+        self.spider = p.loadURDF(urdf_folder, [ 0 , 0 , 0.14 ] , [ 0 , 0 , 0 , 1 ] , globalScaling=sizeFactor)
+        self.obj_of_focus = self.spider
+
+    def reload(self):
+        p.resetBasePositionAndOrientation(self.spider , [ 0 , 0 , 0.15 ] , [ 0 , 0 , 0 , 1 ])
+
+        p.resetBaseVelocity(self.spider, [0, 0, 0], [0, 0, 0])
+        
+        p.setJointMotorControlArray(
+        self.spider,
+        self.joint_ids,
+        controlMode=p.VELOCITY_CONTROL,
+        forces=[0]*self.len_joint_ids
+        )
+        
+        for i in range(p.getNumJoints(self.spider)):
+            p.resetJointState(self.spider, i, targetValue=0, targetVelocity=0)
+
+        for i in range(self.len_joint_ids):
+            self.target[i] = 0 # radian
+        """
+        for _ in range(50):
+            p.stepSimulation()
+
+        """
+        p.setJointMotorControlArray(
+            self.spider,
+            self.joint_ids,
+            p.POSITION_CONTROL,
+            targetPositions=self.target
+        )
+
+    def observe(self):
+
+        self.spiderPosition, self.spiderOrientation = p.getBasePositionAndOrientation(self.spider)
+        self.linearVelocity, _ = p.getBaseVelocity(self.spider)
+
+        self.state = [self.spiderPosition[0], self.spiderPosition[1], self.spiderPosition[2],
+                      self.linearVelocity[0], self.linearVelocity[1], self.linearVelocity[2]]
+
+        """
+        for i in range(p.getNumJoints(spider)):
+            print(p.getJointInfo(spider,i)[3])
+        """
+        # [1] position | [0] velocity
+        for i in range(p.getNumJoints(self.spider)):
+            
+            self.state.append(p.getJointState(self.spider,i)[0]) 
+            self.state.append(p.getJointState(self.spider,i)[1]) 
+
+        #roundState = [ '%.2f' % elem for elem in state]
+        #print(len(state))
+
+        return np.array(self.state, dtype=np.float32)
+
+    def apply_action(self,action):
+
+        action +=1
+
+        # 0 -> 23
+        if action > 12:
+            action -= 12
+            self.target[action] -= self.stepMouvement   
+        
+        else :
+            self.target[action] += self.stepMouvement   
+
+        # clip all the joint depending of their joint types
+        for i in range(env.len_joint_ids):
+
+            if i in self.joint_ids_base_legs:
+                self.target[i] = min(max(self.target[i], self.clip_base_legs[0]) , self.clip_base_legs[1])
+
+            elif i in self.joint_ids_first_legs:
+                self.target[i] = min(max(self.target[i], self.clip_first_legs[0]) , self.clip_first_legs[1])
+
+            elif i in self.joint_ids_second_legs:
+                self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
+        #print(action)
+
 
 # [0] number | [1] name | [2] type | [3] first position index | [4] first velocity index | [5] flags |
 # [6] damping | [7] friction | [8] lower limit | [9] upper limit | [10] max force | [11] max velocity |
@@ -60,60 +160,7 @@ for i in range(p.getNumJoints(spider)):
     print()
 """
 
-position = 0.0
-stepMouvement = 0.01
 
-joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
-joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
-joint_ids_second_legs = [3, 6, 9, 12] # -65 // 90 | -1.1344 // 1.5708
-
-clip_base_legs =   [-1.5708 , 1.5708]
-clip_first_legs =  [-0.7853 , 1.2217]
-clip_second_legs = [-1.1344 , 1.5708]
-
-"""
-print(clip_base_legs[0] , clip_base_legs [1])
-print(clip_first_legs[0] , clip_first_legs [1])
-print(clip_second_legs[0] , clip_second_legs [1])
-"""
-joint_ids = [0,1,2,3,4,5,6,7,8,9,10,11,12]
-
-len_joint_ids = len(joint_ids)
-target = [position] * len_joint_ids
-
-def reload():
-    p.resetBasePositionAndOrientation(spider , [ 0 , 0 , 0.15 ] , [ 0 , 0 , 0 , 1 ])
-
-    p.resetBaseVelocity(spider, [0, 0, 0], [0, 0, 0])
-    
-    p.setJointMotorControlArray(
-    spider,
-    joint_ids,
-    controlMode=p.VELOCITY_CONTROL,
-    forces=[0]*len_joint_ids
-    )
-    
-    for i in range(p.getNumJoints(spider)):
-        p.resetJointState(spider, i, targetValue=0, targetVelocity=0)
-
-    for i in range(len_joint_ids):
-        target[i] = 0 # radian
-    """
-    for _ in range(50):
-        p.stepSimulation()
-
-    """
-    p.setJointMotorControlArray(
-        spider,
-        joint_ids,
-        p.POSITION_CONTROL,
-        targetPositions=target
-    )
-
-
-
-    
-    
 
 
 # --- PPO ---
@@ -186,46 +233,8 @@ class buffer:
 
         return mini_batch
 
-def observe(spider):
-
-    spiderPosition, spiderOrientation = p.getBasePositionAndOrientation(spider)
-    linearVelocity, _ = p.getBaseVelocity(spider)
-
-    state = [spiderPosition[0], spiderPosition[1], spiderPosition[2],
-            linearVelocity[0], linearVelocity[1], linearVelocity[2],
-
-            ]
 
 
-    """
-    for i in range(p.getNumJoints(spider)):
-        print(p.getJointInfo(spider,i)[3])
-    """
-    # [1] position | [0] velocity
-    for i in range(p.getNumJoints(spider)):
-        
-       state.append(p.getJointState(spider,i)[0]) 
-       state.append(p.getJointState(spider,i)[1]) 
-
-    #roundState = [ '%.2f' % elem for elem in state]
-    #print(len(state))
-
-    return np.array(state, dtype=np.float32)
-
-a = []
-
-def apply_action(action):
-
-    action +=1
-
-    # 0 -> 23
-    if action > 12:
-        action -= 12
-        target[action] -= stepMouvement   
-    
-    else :
-        target[action] += stepMouvement   
-    #print(action)
 
 #take subdata and extract info 
 def extract_data_buffer(subdata, dataNumber):
@@ -337,35 +346,36 @@ def PPO_loss(subdata, advantages, model1):
 
 def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
     D_buffer = buffer()
-    reload()
+    env.reload()
     graphReward = []
+    specificGraphReward = []
     episodeLength = []
     optimizer = optim.Adam(model1.parameters(), lr=lr)
 
-    count_frame = 0
-    count_max_training_frames = 0
+    total_count_frame = 0
+    episode_count_frames = 0
 
     for i in range (frames_per_batch):   
-         
-
         keys = p.getKeyboardEvents()
         if ord('c') in keys:
             print('save')
             break
     
         if ord('x') in keys:
-            reload()
+            env.reload()
 
-        if count_max_training_frames >= max_training_frames:
-            episodeLength.append(count_max_training_frames)
-            count_max_training_frames = 0
-            reload()
+
+        # limit episode length
+        if episode_count_frames >= max_training_frames:
+            episodeLength.append(episode_count_frames)
+            episode_count_frames = 0
+            env.reload()
             D_buffer.clear_buffer()
             print(f"Over {max_training_frames} frames : reset")
 
 
         # take info
-        Data = observe(spider)          # data = state = s
+        Data = env.observe()          # data = state = s
 
         # put in tensor for the model
         state_tensor = torch.tensor(Data, dtype=torch.float32)
@@ -379,27 +389,17 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
         action = action_dist.sample().item()        # action = a
 
         #actiona=0
-        apply_action(action)
+        env.apply_action(action)
 
-        # clip all the joint depending of their joint types
-        for i in range(len_joint_ids):
 
-            if i in joint_ids_base_legs:
-                target[i] = min(max(target[i], clip_base_legs[0]) , clip_base_legs[1])
-
-            elif i in joint_ids_first_legs:
-                target[i] = min(max(target[i], clip_first_legs[0]) , clip_first_legs[1])
-
-            elif i in joint_ids_second_legs:
-                target[i] = min(max(target[i], clip_second_legs[0]) , clip_second_legs[1])
         # update the joint position
-        p.setJointMotorControlArray(spider,
-                                    joint_ids,
+        p.setJointMotorControlArray(env.spider,
+                                    env.joint_ids,
                                     p.POSITION_CONTROL,
-                                    target)
+                                    env.target)
         
         
-        focus_position , _ = p.getBasePositionAndOrientation(spider)
+        focus_position , _ = p.getBasePositionAndOrientation(env.spider)
             
         p.resetDebugVisualizerCamera(cameraDistance=7,
                                     cameraYaw=90,
@@ -414,7 +414,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
         #(to know at which point the policy what thinking if it was right)
         log_prob = action_dist.log_prob(torch.tensor(action, dtype=torch.int64)).item()
 
-        next_state = observe(spider)      # next_state = s'
+        next_state = env.observe()      # next_state = s'
         
         reward, done = compute_reward(next_state)     # reward = r
         
@@ -423,12 +423,15 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
 
         graphReward.append(reward)
 
+        if episode_count_frames == max_training_frames // 4:
+            specificGraphReward.append(reward)
+
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
 
         if done:
-            episodeLength.append(count_max_training_frames)
-            count_max_training_frames = 0
-            reload()
+            episodeLength.append(episode_count_frames)
+            episode_count_frames = 0
+            env.reload()
             D_buffer.clear_buffer()
             print(" - - DONE - - ")
 
@@ -443,7 +446,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
             # use to compare the model thus to update the model
             returns = compute_returns(subdata)
             
-            advantages = compute_advantages(subdata, model1,done, gamma, lmbda)
+            advantages = compute_advantages(subdata, model1, done, gamma, lmbda)
             
             advantages = torch.tensor(advantages, dtype=torch.float32)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -466,16 +469,17 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
 
             D_buffer.clear_buffer()
 
-        count_max_training_frames = count_max_training_frames +1
-        count_frame = count_frame + 1
+        episode_count_frames = episode_count_frames +1
+        total_count_frame = total_count_frame + 1
 
-        if count_frame % max_training_frames*4 == 0:
-            print(f"frame count : {count_frame}")
+        if total_count_frame % max_training_frames*4 == 0:
+            print(f"frame count : {total_count_frame}")
 
 
         #p.stepSimulation()
         #time.sleep(1./240.)
-    visual.tensorGraphic(graphReward,episodeLength)
+    
+    visual.third_Tensor_Graphic(graphReward, episodeLength, specificGraphReward)
 
 
 
@@ -530,14 +534,16 @@ def DEBUG():
         time.sleep(1./240.)
 
 
+env = Env()
 
+model1 = ActorCritic(state_dim=32, action_dim=24)
 
 path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
 
 if not os.path.exists(path):
     os.makedirs(path)
 
-focus_position , _ = p.getBasePositionAndOrientation(spider)
+focus_position , _ = p.getBasePositionAndOrientation(env.spider)
     
 p.resetDebugVisualizerCamera(cameraDistance=4,
                             cameraYaw=0,
@@ -546,7 +552,6 @@ p.resetDebugVisualizerCamera(cameraDistance=4,
 
 
 
-model1 = ActorCritic(state_dim=32, action_dim=24)
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3]")
