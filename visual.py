@@ -29,6 +29,11 @@ true_black  = [0.1,0.1,0.1]
 gray        = [150/255, 150/255, 150/255]
 white       = [1, 1, 1]
 
+light_teal  = [176/255, 228/255, 204/255]
+medium_teal = [64/255,  138/255, 113/255]
+dark_teal   = [40/255,  90/255,  72/255]
+black_teal  = [9/255,   20/255,  19/255]
+
 Size = (14,7)
 
 def tensorGraphic(reward, episodeLength):
@@ -63,7 +68,13 @@ def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
 
     plt.savefig("training.png")
 """
-def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
+def third_Tensor_Graphic(reward,
+                        episodeLength,
+                        specificGraphReward10,
+                        specificGraphReward4,
+                        specificGraphReward2,
+                        specificGraphReward1_3,
+                        specificGraphReward1_1 ):
     print("graph")
 
     mosaic = """
@@ -77,15 +88,28 @@ def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
 
 
     axs["A"].set_title("Reward")
-    axs["A"].plot(reward, color = green_light)
+    #axs["A"].plot(specificGraphReward10,  color = [100/255, 200/255, 100/255], alpha = 0.70, linestyle = (0,(2,2.5)))
+    axs["A"].plot(specificGraphReward4,   color = medium_teal , alpha = 0.75,)
+    axs["A"].plot(specificGraphReward2,   color = dark_teal, alpha = 0.80, )
+    axs["A"].plot(specificGraphReward1_3, color = black_teal  , alpha = 0.85, )
+    #axs["A"].plot(specificGraphReward1_1, color = [100/255, 200/255, 80/255 ], alpha = 0.90, linestyle = (0,(2,2.5)))
+
+    # superposer différent reward a différent moment
+
+    
 
     axs["B"].set_title("Reward on 1/4 step")
-    axs["B"].plot(rewardSpe, color = orange)
+    axs["B"].plot(reward, color = orange)
+
     
     axs["D"].set_title("EpisodeLength")
     axs["D"].plot(episodeLength, color = red_light)
 
+    axs["A"].grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
+    axs["B"].grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
+    axs["D"].grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
 
+   
 
     plt.savefig("training.png")
 
