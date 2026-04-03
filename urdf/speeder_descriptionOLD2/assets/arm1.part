@@ -1,13 +1,13 @@
 {
     "configuration": "default",
     "documentId": "39d48276447cd48c86498015",
-    "documentMicroversion": "fda2dd4f8fa12f8837f1ff7b",
+    "documentMicroversion": "7d1de7e761149c2094c9fb9e",
     "elementId": "a0eccf570deb19b09fc621e1",
     "fullConfiguration": "default",
-    "id": "M40o8DkRG/UlIFwF+",
+    "id": "MKuoDMh0uSVhVmgR2",
     "isStandardContent": false,
-    "name": "body <1>",
-    "partId": "JpD",
+    "name": "arm1 <1>",
+    "partId": "JVD",
     "suppressed": false,
     "type": "Part"
 }

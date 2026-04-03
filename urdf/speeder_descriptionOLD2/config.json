@@ -1,0 +1,11 @@
+{
+    "url": "https://cad.onshape.com/documents/39d48276447cd48c86498015/w/39b3d8215a40ceebd5846695/e/a41b11f439c5da9336695592",
+    "assemblyName":"urdf",
+    "outputFormat": "urdf",
+    "addDummyBaseLink": true,
+    "robotName": "droid",
+    "mergeSTLs": "all",
+    "packageName": "speeder_description",   
+    "mergeSTLsCollisions": true,
+}
+
