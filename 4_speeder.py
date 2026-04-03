@@ -68,7 +68,7 @@ class Env():
         self.obj_of_focus = self.spider
 
     def reload(self):
-        p.resetBasePositionAndOrientation(self.spider , [ 0 , 0 , 0.15 ] , [ 0 , 0 , 0 , 1 ])
+        p.resetBasePositionAndOrientation(self.spider , [ 0 , 0 , 0.48 ] , [ 0 , 0 , 0 , 1 ])
 
         p.resetBaseVelocity(self.spider, [0, 0, 0], [0, 0, 0])
         
@@ -142,7 +142,11 @@ class Env():
 
             elif i in self.joint_ids_second_legs:
                 self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
+
+
+        #print(self.target)
         #print(action)
+
 
 
     def compute_reward(self, next_state):
@@ -151,7 +155,7 @@ class Env():
 
         #reward *= next_state[4]
 
-        print(reward)
+        #print(reward)
 
         done = False
 
@@ -356,11 +360,14 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
     env.reload()
     optimizer = optim.Adam(model1.parameters(), lr=lr)
 
+    graphRewardMean = []
     specificGraphReward10  = [] # 1/10
     specificGraphReward4   = [] # 1/4
     specificGraphReward2   = [] # 2/4
     specificGraphReward1_3 = [] # 3/4
     specificGraphReward1_1 = [] # 9/10
+
+    Won = 0
 
     graphReward = []
     episodeLength = []
@@ -384,7 +391,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
             episode_count_frames = 0
             env.reload()
             D_buffer.clear_buffer()
-            print(f"Over {max_training_frames} frames : reset")
+            #print(f"Over {max_training_frames} frames : reset")
 
 
         # take info
@@ -436,6 +443,10 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         graphReward.append(reward)
         
+        if episode_count_frames == max_training_frames-1:
+           
+            graphRewardMean.append(float(np.mean(graphReward)))
+            
 
         if episode_count_frames == max_training_frames // 10:
             specificGraphReward10.append(reward)
@@ -459,6 +470,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
             episode_count_frames = 0
             env.reload()
             D_buffer.clear_buffer()
+            Won += 1
             print(" - - DONE - - ")
 
         # trainig loop
@@ -504,14 +516,15 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         #p.stepSimulation()
         #time.sleep(1./240.)
-    
+    print(Won)
     visual.third_Tensor_Graphic(graphReward,
                                 episodeLength,
                                 specificGraphReward10,
                                 specificGraphReward4,
                                 specificGraphReward2,
                                 specificGraphReward1_3,
-                                specificGraphReward1_1,)
+                                specificGraphReward1_1,
+                                graphRewardMean)
 
 
 
@@ -527,7 +540,7 @@ def DEBUG(env):
             p.disconnect()
 
         if ord('x') in keys:
-            reload()
+            env.reload()
 
         if ord('e') in keys :
             env.apply_action(1)

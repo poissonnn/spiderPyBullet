@@ -20,19 +20,20 @@ def identify_axes(ax_dict, fontsize=48):
         ax.text(0.5, 0.5, k, transform=ax.transAxes, **kw)
 
 red_light   = [220/255, 100/255, 100/255]
+red_dark    = [97 /255, 0  /255, 6  /255]
 green_light = [100/255, 200/255, 100/255]
-green_dark  = [80/255,  180/255, 80/255 ]
+green_dark  = [80 /255, 180/255, 80 /255]
 blue_light  = [100/255, 100/255, 220/255]
-orange      = [241/255, 108/255, 52/255 ]
-black       = [50/255,  51/255,  57/255 ]
+orange      = [232/255, 127/255, 36 /255]
+black       = [50 /255, 51 /255, 57 /255]
 true_black  = [0.1,0.1,0.1]
 gray        = [150/255, 150/255, 150/255]
 white       = [1, 1, 1]
 
-light_teal  = [176/255, 228/255, 204/255]
-medium_teal = [64/255,  138/255, 113/255]
-dark_teal   = [40/255,  90/255,  72/255]
-black_teal  = [9/255,   20/255,  19/255]
+teal_light  = [176/255, 228/255, 204/255]
+teal_medium = [64 /255, 138/255, 113/255]
+teal_dark   = [40 /255, 90 /255, 72 /255]
+teal_black  = [9  /255, 20 /255, 19 /255]
 
 Size = (14,7)
 
@@ -74,9 +75,10 @@ def third_Tensor_Graphic(reward,
                         specificGraphReward4,
                         specificGraphReward2,
                         specificGraphReward1_3,
-                        specificGraphReward1_1 ):
+                        specificGraphReward1_1,
+                        graphRewardMean ):
     print("graph")
-
+    print(graphRewardMean)
     mosaic = """
         AB
         DD
@@ -87,20 +89,21 @@ def third_Tensor_Graphic(reward,
     #identify_axes(axs)
 
 
-    axs["A"].set_title("Reward")
+    axs["A"].set_title("Reward Specific")
     #axs["A"].plot(specificGraphReward10,  color = [100/255, 200/255, 100/255], alpha = 0.70, linestyle = (0,(2,2.5)))
-    axs["A"].plot(specificGraphReward4,   color = medium_teal , alpha = 0.75,)
-    axs["A"].plot(specificGraphReward2,   color = dark_teal, alpha = 0.80, )
-    axs["A"].plot(specificGraphReward1_3, color = black_teal  , alpha = 0.85, )
+    axs["A"].plot(specificGraphReward4,   color = teal_medium , alpha = 0.75,)
+    axs["A"].plot(specificGraphReward2,   color = teal_dark, alpha = 0.80, )
+    axs["A"].plot(specificGraphReward1_3, color = teal_black  , alpha = 0.85, )
     #axs["A"].plot(specificGraphReward1_1, color = [100/255, 200/255, 80/255 ], alpha = 0.90, linestyle = (0,(2,2.5)))
 
     # superposer différent reward a différent moment
 
     
 
-    axs["B"].set_title("Reward on 1/4 step")
-    axs["B"].plot(reward, color = orange)
+    axs["B"].set_title("Reward")
+    axs["B"].plot(reward, color = orange, zorder = 1)
 
+    axs["B"].plot(graphRewardMean, color = red_dark, zorder = 2)
     
     axs["D"].set_title("EpisodeLength")
     axs["D"].plot(episodeLength, color = red_light)
