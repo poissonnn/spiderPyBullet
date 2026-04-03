@@ -254,12 +254,13 @@ class buffer:
         return self.buffer
 
     def sample(self, batch_size):
+        """
         random.shuffle(self.buffer)
 
         mini_batch = self.buffer[0:batch_size]
-
+        """
+        mini_batch = self.buffer[0:batch_size]
         return mini_batch
-
 
 #take subdata and extract info 
 def extract_data_buffer(subdata, dataNumber):
@@ -269,8 +270,6 @@ def extract_data_buffer(subdata, dataNumber):
 
         return data
  
-
-
 def compute_returns(subdata):
     G = 0
     G_t = []
@@ -283,7 +282,7 @@ def compute_returns(subdata):
 
     return G_t
 
-def compute_advantages(subdata, values, dones, gamma, lambda_):
+def compute_advantages(subdata, dones, gamma, lambda_):
     advantages = []
     last_advantage = 0
 
@@ -355,22 +354,31 @@ def PPO_loss(subdata, advantages, model1):
     
     return policy_loss
 
+def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards):
+    episodeLength.append(episode_count_frames)
+    episode_count_frames = 0
+    episodes_rewards.append(current_rewards)
+    current_rewards = []
+    env.reload()
+    D_buffer.clear_buffer()
+    return episode_count_frames, current_rewards, episodes_rewards
+    #print(f"Over {max_training_frames} frames : reset")
+
+
 def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env):
     D_buffer = buffer()
     env.reload()
     optimizer = optim.Adam(model1.parameters(), lr=lr)
 
     graphRewardMean = []
-    specificGraphReward10  = [] # 1/10
-    specificGraphReward4   = [] # 1/4
-    specificGraphReward2   = [] # 2/4
-    specificGraphReward1_3 = [] # 3/4
-    specificGraphReward1_1 = [] # 9/10
+
+    episodes_rewards = []
+    current_rewards = []
+    graphRewards = []
+    
+    episodeLength = []
 
     Won = 0
-
-    graphReward = []
-    episodeLength = []
 
     total_count_frame = 0
     episode_count_frames = 0
@@ -384,15 +392,9 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
         if ord('x') in keys:
             env.reload()
 
-
         # limit episode length
         if episode_count_frames >= max_training_frames:
-            episodeLength.append(episode_count_frames)
-            episode_count_frames = 0
-            env.reload()
-            D_buffer.clear_buffer()
-            #print(f"Over {max_training_frames} frames : reset")
-
+            episode_count_frames, current_rewards, episodes_rewards= reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards)
 
         # take info
         Data = env.observe()          # data = state = s
@@ -410,7 +412,6 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         #actiona=0
         env.apply_action(action)
-
 
         # update the joint position
         p.setJointMotorControlArray(env.spider,
@@ -438,38 +439,14 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
         
         reward, done = env.compute_reward(next_state)     # reward = r
         
-        #done = 0
-        #reward = 0
-
-        graphReward.append(reward)
+        current_rewards.append(reward)
+        graphRewards.append(reward)
         
-        if episode_count_frames == max_training_frames-1:
-           
-            graphRewardMean.append(float(np.mean(graphReward)))
-            
-
-        if episode_count_frames == max_training_frames // 10:
-            specificGraphReward10.append(reward)
-
-        if episode_count_frames == max_training_frames // 4:
-            specificGraphReward4.append(reward)
-
-        if episode_count_frames == max_training_frames // 2:
-            specificGraphReward2.append(reward)
-
-        if episode_count_frames == max_training_frames // 1.333:
-            specificGraphReward1_3.append(reward)
-
-        if episode_count_frames == max_training_frames // 1.111:
-            specificGraphReward1_1.append(reward)
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
 
         if done:
-            episodeLength.append(episode_count_frames)
-            episode_count_frames = 0
-            env.reload()
-            D_buffer.clear_buffer()
+            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards)
             Won += 1
             print(" - - DONE - - ")
 
@@ -484,7 +461,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
             # use to compare the model thus to update the model
             returns = compute_returns(subdata)
             
-            advantages = compute_advantages(subdata, model1, done, gamma, lmbda)
+            advantages = compute_advantages(subdata, done, gamma, lmbda)
             
             advantages = torch.tensor(advantages, dtype=torch.float32)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -516,16 +493,13 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         #p.stepSimulation()
         #time.sleep(1./240.)
-    print(Won)
-    visual.third_Tensor_Graphic(graphReward,
+    print(f"Number of Finish Episode : {Won}")
+    #print(episodeLength)
+    
+    visual.third_Tensor_Graphic(graphRewards,
                                 episodeLength,
-                                specificGraphReward10,
-                                specificGraphReward4,
-                                specificGraphReward2,
-                                specificGraphReward1_3,
-                                specificGraphReward1_1,
-                                graphRewardMean)
-
+                                episodes_rewards)
+    
 
 
 def DEBUG(env):
@@ -573,12 +547,6 @@ def DEBUG(env):
 
         p.stepSimulation()
         time.sleep(1./240.)
-
-
-
-
-
-
 
 
 model1 = ActorCritic(state_dim=32, action_dim=24)

@@ -69,21 +69,41 @@ def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
 
     plt.savefig("training.png")
 """
+graphRewardMean        = []
+specificGraphReward10  = [] 
+specificGraphReward4   = [] 
+specificGraphReward2   = [] 
+specificGraphReward1_3 = []
+specificGraphReward1_1 = []
+XGraphRewardMean       = []
+
 def third_Tensor_Graphic(reward,
                         episodeLength,
-                        specificGraphReward10,
-                        specificGraphReward4,
-                        specificGraphReward2,
-                        specificGraphReward1_3,
-                        specificGraphReward1_1,
-                        graphRewardMean ):
+                        episodes_rewards):
+
+
+
     print("graph")
-    print(graphRewardMean)
+
+
     mosaic = """
         AB
         DD
         """
     
+
+    for i in range(len(episodes_rewards)):
+        graphRewardMean.append(float(np.mean(episodes_rewards[i])))
+
+        specificGraphReward10.append(episodes_rewards[i][len(episodes_rewards[i])//10]) 
+        specificGraphReward4.append(episodes_rewards[i][len(episodes_rewards[i])//7]) 
+        specificGraphReward2.append(episodes_rewards[i][len(episodes_rewards[i])//2]) 
+        specificGraphReward1_3.append(episodes_rewards[i][int(len(episodes_rewards[i])//1.333)])  
+        specificGraphReward1_1.append(episodes_rewards[i][int(len(episodes_rewards[i])//1.111)])  
+
+
+
+
     fig = plt.figure(constrained_layout=True)
     axs = fig.subplot_mosaic(mosaic)
     #identify_axes(axs)
@@ -98,12 +118,19 @@ def third_Tensor_Graphic(reward,
 
     # superposer différent reward a différent moment
 
-    
+    #halfEpisodeLength = np.array(episodeLength) / 2
+
+
+    totalLength = 0
+    for Length in episodeLength:
+        totalLength += Length
+        XGraphRewardMean.append(totalLength)
+
 
     axs["B"].set_title("Reward")
     axs["B"].plot(reward, color = orange, zorder = 1)
-
-    axs["B"].plot(graphRewardMean, color = red_dark, zorder = 2)
+    
+    axs["B"].plot(XGraphRewardMean, graphRewardMean, color = red_dark, zorder = 2)
     
     axs["D"].set_title("EpisodeLength")
     axs["D"].plot(episodeLength, color = red_light)
