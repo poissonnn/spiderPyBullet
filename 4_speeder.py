@@ -23,6 +23,11 @@ import visual
 def radian(x):
     return 180 * x / np.pi
 
+path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
+
+if not os.path.exists(path):
+    os.makedirs(path)
+
 # --- PYBULLET ---
 
 class Env():
@@ -127,7 +132,7 @@ class Env():
             self.target[action] += self.stepMouvement   
 
         # clip all the joint depending of their joint types
-        for i in range(env.len_joint_ids):
+        for i in range(self.len_joint_ids):
 
             if i in self.joint_ids_base_legs:
                 self.target[i] = min(max(self.target[i], self.clip_base_legs[0]) , self.clip_base_legs[1])
@@ -138,6 +143,24 @@ class Env():
             elif i in self.joint_ids_second_legs:
                 self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
         #print(action)
+
+
+    def compute_reward(self, next_state):
+
+        reward = float(next_state[1])
+
+        #reward *= next_state[4]
+
+        print(reward)
+
+        done = False
+
+        if next_state[1] > 3:
+            done = True
+            reward += 10
+
+        return reward, done
+
 
 
 # [0] number | [1] name | [2] type | [3] first position index | [4] first velocity index | [5] flags |
@@ -158,8 +181,8 @@ for i in range(p.getNumJoints(spider)):
     print(f"{jlower} -> {jlowerDegree}")
     print(f"{jupper} -> {jupperDegree}")
     print()
-"""
 
+"""
 
 
 
@@ -234,8 +257,6 @@ class buffer:
         return mini_batch
 
 
-
-
 #take subdata and extract info 
 def extract_data_buffer(subdata, dataNumber):
         data = []
@@ -244,21 +265,7 @@ def extract_data_buffer(subdata, dataNumber):
 
         return data
  
-def compute_reward(next_state):
 
-    reward = next_state[1]
-
-    #reward *= next_state[4]
-
-    print(reward)
-
-    done = False
-
-    if next_state[1] > 3:
-        done = True
-        reward += 10
-
-    return reward, done
 
 def compute_returns(subdata):
     G = 0
@@ -344,13 +351,19 @@ def PPO_loss(subdata, advantages, model1):
     
     return policy_loss
 
-def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
+def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env):
     D_buffer = buffer()
     env.reload()
-    graphReward = []
-    specificGraphReward = []
-    episodeLength = []
     optimizer = optim.Adam(model1.parameters(), lr=lr)
+
+    specificGraphReward10  = [] # 1/10
+    specificGraphReward4   = [] # 1/4
+    specificGraphReward2   = [] # 2/4
+    specificGraphReward1_3 = [] # 3/4
+    specificGraphReward1_1 = [] # 9/10
+
+    graphReward = []
+    episodeLength = []
 
     total_count_frame = 0
     episode_count_frames = 0
@@ -403,7 +416,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
             
         p.resetDebugVisualizerCamera(cameraDistance=7,
                                     cameraYaw=90,
-                                    cameraPitch=-40,
+                                    cameraPitch=-20,
                                     cameraTargetPosition = focus_position)
 
         p.stepSimulation()
@@ -416,15 +429,28 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
 
         next_state = env.observe()      # next_state = s'
         
-        reward, done = compute_reward(next_state)     # reward = r
+        reward, done = env.compute_reward(next_state)     # reward = r
         
         #done = 0
         #reward = 0
 
         graphReward.append(reward)
+        
+
+        if episode_count_frames == max_training_frames // 10:
+            specificGraphReward10.append(reward)
 
         if episode_count_frames == max_training_frames // 4:
-            specificGraphReward.append(reward)
+            specificGraphReward4.append(reward)
+
+        if episode_count_frames == max_training_frames // 2:
+            specificGraphReward2.append(reward)
+
+        if episode_count_frames == max_training_frames // 1.333:
+            specificGraphReward1_3.append(reward)
+
+        if episode_count_frames == max_training_frames // 1.111:
+            specificGraphReward1_1.append(reward)
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
 
@@ -479,15 +505,21 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames):
         #p.stepSimulation()
         #time.sleep(1./240.)
     
-    visual.third_Tensor_Graphic(graphReward, episodeLength, specificGraphReward)
+    visual.third_Tensor_Graphic(graphReward,
+                                episodeLength,
+                                specificGraphReward10,
+                                specificGraphReward4,
+                                specificGraphReward2,
+                                specificGraphReward1_3,
+                                specificGraphReward1_1,)
 
 
 
-def DEBUG():
+def DEBUG(env):
+    env.reload()
 
     while True:
-
-        observe(spider)
+        
 
         keys = p.getKeyboardEvents()
         
@@ -498,60 +530,45 @@ def DEBUG():
             reload()
 
         if ord('e') in keys :
-            target[12] += stepMouvement      
+            env.apply_action(1)
+            env.apply_action(4)  
+            env.apply_action(7)  
+            env.apply_action(10)      
 
         if ord('d') in keys :
-            target[12] -= stepMouvement     
+            env.apply_action(13)
+            env.apply_action(16)  
+            env.apply_action(19)  
+            env.apply_action(22)    
 
-        # clip all the joint depending of their joint types
-        for i in range(len_joint_ids):
 
-            if i in joint_ids_base_legs:
-                target[i] = min(max(target[i], clip_base_legs[0]) , clip_base_legs[1])
 
-            elif i in joint_ids_first_legs:
-                target[i] = min(max(target[i], clip_first_legs[0]) , clip_first_legs[1])
-
-            elif i in joint_ids_second_legs:
-                target[i] = min(max(target[i], clip_second_legs[0]) , clip_second_legs[1])
-     
-     
         # update the joint position
-        p.setJointMotorControlArray(spider,
-                                    joint_ids,
+        p.setJointMotorControlArray(env.spider,
+                                    env.joint_ids,
                                     p.POSITION_CONTROL,
-                                    target)
+                                    env.target)
+        
+        
+        focus_position , _ = p.getBasePositionAndOrientation(env.spider)
             
-            
-        focus_position , _ = p.getBasePositionAndOrientation(spider)
-            
-        p.resetDebugVisualizerCamera(cameraDistance=4,
-                                    cameraYaw=0,
-                                    cameraPitch=-60,
+        p.resetDebugVisualizerCamera(cameraDistance=7,
+                                    cameraYaw=90,
+                                    cameraPitch=-20,
                                     cameraTargetPosition = focus_position)
+
 
         p.stepSimulation()
         time.sleep(1./240.)
 
 
-env = Env()
+
+
+
+
+
 
 model1 = ActorCritic(state_dim=32, action_dim=24)
-
-path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
-
-if not os.path.exists(path):
-    os.makedirs(path)
-
-focus_position , _ = p.getBasePositionAndOrientation(env.spider)
-    
-p.resetDebugVisualizerCamera(cameraDistance=4,
-                            cameraYaw=0,
-                            cameraPitch=-40,
-                            cameraTargetPosition = focus_position)
-
-
-
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3]")
@@ -573,7 +590,6 @@ while True:
 
     # train
     elif QuestionAction == 1:
-
         print("\nGo for training")
         print("Number of frames per batch [default = 122880] :")
         choice = input()
@@ -601,7 +617,8 @@ while True:
         print(f"training model with {sub_batch_size} frames per sub batch ")
         print(f"training model with {max_training_frames} max frames per episode")
 
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames)
+        env1 = Env()
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames,env1)
 
 
         print("Do you want to save the model : yes [1] | no [2] ")
@@ -634,7 +651,8 @@ while True:
 
     elif QuestionAction == 3:
         print("DEBUG")
-        DEBUG()
+        env1 = Env()
+        DEBUG(env1)
 
     
 p.disconnect()

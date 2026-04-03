@@ -29,7 +29,7 @@ print("hello PYBullet")
 # p.GUI
 #or p.DIRECT for non-graphical version
 # connexion a la simulation
-physicsClient = p.connect(p.GUI)
+physicsClient = p.connect(p.DIRECT)
 
 # charger les fichiers de base
 p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
