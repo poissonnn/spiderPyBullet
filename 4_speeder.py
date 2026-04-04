@@ -34,8 +34,9 @@ class Env():
     def __init__(self):
         self.step_count = 0
         self.position = 0.0
-        self.stepMouvement = 0.01
-        self.maxRotation = 0.2
+        self.stepMouvement = 0.02
+        self.maxAcceptRotation = 0.2
+        self.maxRotation = 0.6
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
         self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
@@ -150,67 +151,68 @@ class Env():
 
     def compute_reward(self, next_state):
 
-        reward = float(next_state[1])
+        reward = next_state[4]
 
+        #print(reward)
+        
         #reward *= next_state[4]
-
-        print(reward)
-
+        won = False
         done = False
         self.linkState = p.getLinkState(self.spider,0)
 
 
+        
+        # fliping to the side
+        if self.linkState[1][1] > self.maxAcceptRotation or self.linkState[1][1] < -self.maxAcceptRotation:
+            reward -= abs(self.linkState[1][1])
+
+        # reset if flip to much
         if self.linkState[1][1] > self.maxRotation or self.linkState[1][1] < -self.maxRotation:
-            
-            reward -= 0.5
+            print(self.linkState[1][1])
+            reward -= 1 
+            done = True
+            print("fall side")
 
-        if self.linkState[1][0] > self.maxRotation or self.linkState[1][0] < -self.maxRotation:
-            
-            reward -= 0.5
+        # fliping to the front or rear
+        if self.linkState[1][0] > self.maxAcceptRotation or self.linkState[1][0] < -self.maxAcceptRotation:
+            reward -= abs(self.linkState[1][0])
 
+        # reset if flip to much
+        if self.linkState[1][0] > self.maxRotation or self.linkState[1][0] < -self.maxRotation:  
+            print(self.linkState[1][0])
+            reward -= 1 
+            print("fall rear")
+            done = True
+        
+        # fall
         if self.linkState[0][2] < 0.2:
-            
-            reward -= 0.5
+            reward -= 0.08
 
+        
+        # stand
         if self.linkState[0][2] > 0.5 and self.linkState[0][2] < 0.8:
             
-            reward += 0.05
+            reward += 0.07
 
 
         if next_state[1] > 3:
-            done = True
-            reward += 10
+            won = True
+            reward += 100
+        
+        #print(reward)
+        return reward, done,won
 
-        return reward, done
 
 
-# [0] number | [1] name | [2] type | [3] first position index | [4] first velocity index | [5] flags |
-# [6] damping | [7] friction | [8] lower limit | [9] upper limit | [10] max force | [11] max velocity |
-# [12] link name | [13] joint axis | [14] parent position | [15] parent orientation | [16] parent index
 
-"""
-for i in range(p.getNumJoints(spider)):
-
-    name = p.getJointInfo(spider,i)[1]
-    number = p.getJointInfo(spider,i)[0]
-    print(f"name : {name} number : {number}")
-    jlower = p.getJointInfo(spider , i)[8]
-    jupper = p.getJointInfo(spider , i)[9]
-    jlowerDegree = round( radian(p.getJointInfo(spider,i)[8]), 3)
-    jupperDegree = round( radian(p.getJointInfo(spider,i)[9]), 3)
-
-    print(f"{jlower} -> {jlowerDegree}")
-    print(f"{jupper} -> {jupperDegree}")
-    print()
-"""
 
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
-lr = 3e-4
+lr = 0.001
 max_grad_norm = 1.0
 
-clip_epsilon = (0.2) # value of the PPO loss
+clip_epsilon = (0.3) # value of the PPO loss
 gamma = 0.99
 lmbda = 0.95
 entropy_eps = 0.01
@@ -296,7 +298,7 @@ def compute_returns(subdata):
 
     return G_t
 
-def compute_advantages(subdata, dones, gamma, lambda_):
+def compute_advantages(subdata, gamma, lambda_):
     advantages = []
     last_advantage = 0
 
@@ -374,7 +376,7 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     episodes_rewards.append(current_rewards)
     current_rewards = []
     env.reload()
-    D_buffer.clear_buffer()
+    
     """
     visual.third_Tensor_Graphic(graphRewards,
                                 episodeLength,
@@ -459,15 +461,21 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         next_state = env.observe()      # next_state = s'
         
-        reward, done = env.compute_reward(next_state)     # reward = r
+        reward, done, won = env.compute_reward(next_state)     # reward = r
         
         current_rewards.append(reward)
         graphRewards.append(reward)
         
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
-
         if done:
+            D_buffer.clear_buffer()
+            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
+                                                                episode_count_frames,
+                                                                D_buffer, env, episodes_rewards,
+                                                                current_rewards, graphRewards)
+
+        elif won:
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                             episode_count_frames,
                                                                             D_buffer, env, episodes_rewards,
@@ -483,7 +491,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
             # use to compare the model thus to update the model
             returns = compute_returns(subdata)
     
-            advantages = compute_advantages(subdata, done, gamma, lmbda)
+            advantages = compute_advantages(subdata, gamma, lmbda)
             advantages = torch.tensor(advantages, dtype=torch.float32)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
@@ -538,6 +546,12 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 def DEBUG(env):
     env.reload()
     cameraPitch = 40
+    reward = 0
+
+    # [0] number | [1] name | [2] type | [3] first position index | [4] first velocity index | [5] flags |
+    # [6] damping | [7] friction | [8] lower limit | [9] upper limit | [10] max force | [11] max velocity |
+    # [12] link name | [13] joint axis | [14] parent position | [15] parent orientation | [16] parent index
+
 
     for i in range(p.getNumJoints(env.spider)):
 
@@ -555,7 +569,7 @@ def DEBUG(env):
 
     while True:
         
-
+        
         keys = p.getKeyboardEvents()
 
         if ord('x') in keys:
@@ -588,17 +602,24 @@ def DEBUG(env):
 
         linkState = p.getLinkState(env.spider,0)
 
+
         if linkState[1][1] > 0.2 or linkState[1][1] < -0.2:
-            print(linkState[1][1])
+            #print(linkState[1][1])
+            reward = -abs(linkState[1][1])
+            print(reward)
 
         if linkState[1][0] > 0.2 or linkState[1][0] < -0.2:
-            print(linkState[1][0])
+            #print(linkState[1][0])
+            reward = -abs(linkState[1][0])
+            print(reward)
 
         if linkState[0][2] < 0.2 :
             print(linkState[0][2])
 
+        """
         if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
             print(linkState[0][2])
+        """
 
         # update the joint position
         p.setJointMotorControlArray(env.spider,
@@ -620,6 +641,7 @@ def DEBUG(env):
 
 
 model1 = ActorCritic(state_dim=32, action_dim=24)
+env1 = Env()
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3]")
@@ -642,13 +664,13 @@ while True:
     # train
     elif QuestionAction == 1:
         print("\nGo for training")
-        print("Number of frames per batch [default = 122880] :")
+
+        print("Number of frames per batch [default = 122k] :")
         choice = input()
         if choice.isdigit():
-            frames_per_batch = int(choice)
+            frames_per_batch = int(choice) * 1000
         else:
             frames_per_batch = 122880
-
 
         print("Size of the buffer for the PPO [default = 2048] :")
         choice = input()
@@ -657,20 +679,19 @@ while True:
         else:
             buffer_Collect_Size = 2048
 
-        print("Number of epochs [default = 5] :")
+        print("Number of epochs [default = 15] :")
         choice = input()
         if choice.isdigit():
             num_epochs = int(choice)
         else:
-            num_epochs = 5
+            num_epochs = 15
 
-
-        print("Number of frames per sub batch [default = 128] :")
+        print("Number of frames per sub batch [default = 512] :")
         choice = input()
         if choice.isdigit():
             sub_batch_size = int(choice)
         else:
-            sub_batch_size = 128
+            sub_batch_size = 512
 
         print("Max frames per episode [default = 4096] :")
         choice = input()
@@ -687,13 +708,13 @@ while True:
         print(f"training model with {max_training_frames} max frames per episode")
         print()
 
-        env1 = Env()
+        
         training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
 
         print("Do you want to save the model : yes [1] | no [2] ")
         choiceSave = input().strip()
-        Save = int(choiceSave)
+        Save = choiceSave
 
         if Save == 2:
             print("model not saved :(")
@@ -721,7 +742,6 @@ while True:
 
     elif QuestionAction == 3:
         print("DEBUG")
-        env1 = Env()
         DEBUG(env1)
 
     
