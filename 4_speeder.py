@@ -36,7 +36,7 @@ class Env():
         self.position = 0.0
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
-        self.maxRotation = 0.6
+        self.maxRotation = 0.3
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
         self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
@@ -151,7 +151,7 @@ class Env():
 
     def compute_reward(self, next_state):
 
-        reward = next_state[4]
+        reward = 0
 
         #print(reward)
         
@@ -164,40 +164,41 @@ class Env():
         
         # fliping to the side
         if self.linkState[1][1] > self.maxAcceptRotation or self.linkState[1][1] < -self.maxAcceptRotation:
-            reward -= abs(self.linkState[1][1])
+            reward -= abs(self.linkState[1][1])*2
 
         # reset if flip to much
         if self.linkState[1][1] > self.maxRotation or self.linkState[1][1] < -self.maxRotation:
             print(self.linkState[1][1])
-            reward -= 1 
+            reward -= 1.5 
             done = True
             print("fall side")
 
         # fliping to the front or rear
         if self.linkState[1][0] > self.maxAcceptRotation or self.linkState[1][0] < -self.maxAcceptRotation:
-            reward -= abs(self.linkState[1][0])
+            reward -= abs(self.linkState[1][0])*2
 
         # reset if flip to much
         if self.linkState[1][0] > self.maxRotation or self.linkState[1][0] < -self.maxRotation:  
             print(self.linkState[1][0])
-            reward -= 1 
+            reward -= 1.5
             print("fall rear")
             done = True
         
         # fall
         if self.linkState[0][2] < 0.2:
-            reward -= 0.08
+            reward -= 0.2
 
         
         # stand
         if self.linkState[0][2] > 0.5 and self.linkState[0][2] < 0.8:
             
-            reward += 0.07
-
+            reward += 0.2
+            reward += next_state[4]
+        
 
         if next_state[1] > 3:
             won = True
-            reward += 100
+            reward += 5
         
         #print(reward)
         return reward, done,won
@@ -698,7 +699,7 @@ while True:
         if choice.isdigit():
             max_training_frames = int(choice)
         else:
-            max_training_frames = 4096
+            max_training_frames = 9192
         
 
         print(f"training model with {frames_per_batch} frames per batch ")
