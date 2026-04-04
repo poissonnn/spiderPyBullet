@@ -35,6 +35,7 @@ class Env():
         self.step_count = 0
         self.position = 0.0
         self.stepMouvement = 0.01
+        self.maxRotation = 0.2
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
         self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
@@ -147,8 +148,6 @@ class Env():
         #print(self.target)
         #print(action)
 
-
-
     def compute_reward(self, next_state):
 
         reward = float(next_state[1])
@@ -158,13 +157,31 @@ class Env():
         #print(reward)
 
         done = False
+        self.linkState = p.getLinkState(self.spider,0)
+
+
+        if self.linkState[1][1] > self.maxRotation or self.linkState[1][1] < -self.maxRotation:
+            
+            reward -= 0.5
+
+        if self.linkState[1][0] > self.maxRotation or self.linkState[1][0] < -self.maxRotation:
+            
+            reward -= 0.5
+
+        if self.linkState[0][2] < 0.2:
+            
+            reward -= 0.5
+
+        if self.linkState[0][2] > 0.5 and self.linkState[0][2] < 0.8:
+            
+            reward += 0.05
+
 
         if next_state[1] > 3:
             done = True
             reward += 10
 
         return reward, done
-
 
 
 # [0] number | [1] name | [2] type | [3] first position index | [4] first velocity index | [5] flags |
@@ -185,10 +202,7 @@ for i in range(p.getNumJoints(spider)):
     print(f"{jlower} -> {jlowerDegree}")
     print(f"{jupper} -> {jupperDegree}")
     print()
-
 """
-
-
 
 # --- PPO ---
 
@@ -202,12 +216,12 @@ lmbda = 0.95
 entropy_eps = 1e-3
 
 class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim = 64):
+    def __init__(self, state_dim, action_dim, hidden_dim = 256):
         super().__init__()
 
         # X depends on the state_dim and actio_dim
         # X = 32
-        # X input -> 64 hidden neurone -> 64 hidden neurone -> 32 hidden neurone
+        # X input -> 256 hidden neurone -> 256 hidden neurone -> 128 hidden neurone
         # this is a common part and divided to actor and to critic
         self.shared_layers = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
@@ -218,7 +232,7 @@ class ActorCritic(nn.Module):
             nn.ReLU()
         )
 
-        # 32 hidden neurone -> 16 hidden neurone -> X probability with the softmax
+        # 128 hidden neurone -> 64 hidden neurone -> X probability with the softmax
         self.actor = nn.Sequential(
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
@@ -226,7 +240,7 @@ class ActorCritic(nn.Module):
             nn.Softmax(dim=-1)
         )
 
-        # 32 hidden neurone -> 16 hidden neurone -> 1 estimation of how many point the future ia can win
+        # 128 hidden neurone -> 64 hidden neurone -> 1 estimation of how many point the future ia can win
         self.critic = nn.Sequential(
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
@@ -354,13 +368,18 @@ def PPO_loss(subdata, advantages, model1):
     
     return policy_loss
 
-def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards):
+def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards, graphRewards):
     episodeLength.append(episode_count_frames)
     episode_count_frames = 0
     episodes_rewards.append(current_rewards)
     current_rewards = []
     env.reload()
     D_buffer.clear_buffer()
+    """
+    visual.third_Tensor_Graphic(graphRewards,
+                                episodeLength,
+                                episodes_rewards)
+    """
     return episode_count_frames, current_rewards, episodes_rewards
     #print(f"Over {max_training_frames} frames : reset")
 
@@ -380,6 +399,9 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
     Won = 0
 
+    num_epochs = 4
+    sub_batch_size = 2048
+
     total_count_frame = 0
     episode_count_frames = 0
 
@@ -394,7 +416,10 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         # limit episode length
         if episode_count_frames >= max_training_frames:
-            episode_count_frames, current_rewards, episodes_rewards= reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards)
+            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
+                                                                            episode_count_frames,
+                                                                            D_buffer, env, episodes_rewards,
+                                                                            current_rewards, graphRewards)
 
         # take info
         Data = env.observe()          # data = state = s
@@ -446,7 +471,10 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
 
         if done:
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards)
+            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
+                                                                            episode_count_frames,
+                                                                            D_buffer, env, episodes_rewards,
+                                                                            current_rewards, graphRewards)
             Won += 1
             print(" - - DONE - - ")
 
@@ -489,6 +517,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
         if total_count_frame % max_training_frames*4 == 0:
             print(f"frame count : {total_count_frame}")
+            
 
 
         #p.stepSimulation()
@@ -504,14 +533,26 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
 
 def DEBUG(env):
     env.reload()
+    cameraPitch = 40
+
+    for i in range(p.getNumJoints(env.spider)):
+
+        name = p.getJointInfo(env.spider,i)[1]
+        number = p.getJointInfo(env.spider,i)[0]
+        print(f"name : {name} number : {number}")
+        jlower = p.getJointInfo(env.spider , i)[8]
+        jupper = p.getJointInfo(env.spider , i)[9]
+        jlowerDegree = round( radian(p.getJointInfo(env.spider,i)[8]), 3)
+        jupperDegree = round( radian(p.getJointInfo(env.spider,i)[9]), 3)
+
+        print(f"{jlower} -> {jlowerDegree}")
+        print(f"{jupper} -> {jupperDegree}")
+        print()
 
     while True:
         
 
         keys = p.getKeyboardEvents()
-        
-        if ord('c') in keys:
-            p.disconnect()
 
         if ord('x') in keys:
             env.reload()
@@ -528,7 +569,32 @@ def DEBUG(env):
             env.apply_action(19)  
             env.apply_action(22)    
 
+        if ord('o') in keys : 
+            cameraPitch += 0.2
+        
+        if ord('l') in keys : 
+            cameraPitch -= 0.2
 
+        if ord('f') in keys:
+            linkState = p.getLinkState(env.spider,0)
+            print()
+            for i in range(4):
+                print(i)
+                print(round(linkState[1][i],2))
+
+        linkState = p.getLinkState(env.spider,0)
+
+        if linkState[1][1] > 0.2 or linkState[1][1] < -0.2:
+            print(linkState[1][1])
+
+        if linkState[1][0] > 0.2 or linkState[1][0] < -0.2:
+            print(linkState[1][0])
+
+        if linkState[0][2] < 0.2 :
+            print(linkState[0][2])
+
+        if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
+            print(linkState[0][2])
 
         # update the joint position
         p.setJointMotorControlArray(env.spider,
@@ -541,7 +607,7 @@ def DEBUG(env):
             
         p.resetDebugVisualizerCamera(cameraDistance=7,
                                     cameraYaw=90,
-                                    cameraPitch=-20,
+                                    cameraPitch=-cameraPitch,
                                     cameraTargetPosition = focus_position)
 
 
