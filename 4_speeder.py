@@ -154,7 +154,7 @@ class Env():
 
         #reward *= next_state[4]
 
-        #print(reward)
+        print(reward)
 
         done = False
         self.linkState = p.getLinkState(self.spider,0)
@@ -213,7 +213,7 @@ max_grad_norm = 1.0
 clip_epsilon = (0.2) # value of the PPO loss
 gamma = 0.99
 lmbda = 0.95
-entropy_eps = 1e-3
+entropy_eps = 0.01
 
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim = 256):
@@ -384,7 +384,7 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     #print(f"Over {max_training_frames} frames : reset")
 
 
-def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env):
+def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
     D_buffer = buffer()
     env.reload()
     optimizer = optim.Adam(model1.parameters(), lr=lr)
@@ -398,9 +398,6 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
     episodeLength = []
 
     Won = 0
-
-    num_epochs = 4
-    sub_batch_size = 2048
 
     total_count_frame = 0
     episode_count_frames = 0
@@ -478,37 +475,44 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env)
             Won += 1
             print(" - - DONE - - ")
 
-        # trainig loop
-        if len(D_buffer.buffer) >= sub_batch_size:
-
-            optimizer.zero_grad()
-
+        # learning loop
+        if len(D_buffer.buffer) >= buffer_Collect_Size:
             subdata = D_buffer.sample(sub_batch_size)
 
             # calculate the amount of reward the model should get
             # use to compare the model thus to update the model
             returns = compute_returns(subdata)
-            
+    
             advantages = compute_advantages(subdata, done, gamma, lmbda)
-            
             advantages = torch.tensor(advantages, dtype=torch.float32)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
+            for epoch in range(num_epochs):
+                indices = list(range(len(subdata))) # list 1,2 ... X | X = length of the subdata
+                random.shuffle(indices)             # shuffle the indicies
 
-            # calculate the loss of the policy for the actor
-            policy_loss =  PPO_loss(subdata, advantages, model1)
+                for start in range(0, len(subdata), sub_batch_size): # divide the subdata in smaller size
+                    idx              = indices[start : start + sub_batch_size]                   # PPO main core is here
+                    mini_batch       = [D_buffer.buffer[i] for i in idx] # = subdata
+                    advantages_batch = advantages[idx]                   # = advantages
+                    returns_batch    = [returns[i] for i in idx]         # = returns
 
-            # calculate the loss of the policy for the critic
-            value_loss = compute_value_loss(subdata, returns, model1)
+                    optimizer.zero_grad() 
 
-            loss = policy_loss + value_loss 
-            #print(loss)
-            
-            loss.backward()
+                    # calculate the loss of the policy for the actor
+                    policy_loss =  PPO_loss(mini_batch, advantages_batch, model1)
 
-            torch.nn.utils.clip_grad_norm_(model1.parameters(), max_grad_norm)
+                    # calculate the loss of the policy for the critic
+                    value_loss = compute_value_loss(mini_batch, returns_batch, model1)
 
-            optimizer.step()
+                    loss = policy_loss + value_loss 
+                    #print(loss)
+                    
+                    loss.backward()
+
+                    torch.nn.utils.clip_grad_norm_(model1.parameters(), max_grad_norm)
+
+                    optimizer.step()
 
             D_buffer.clear_buffer()
 
@@ -645,6 +649,22 @@ while True:
         else:
             frames_per_batch = 122880
 
+
+        print("Size of the buffer for the PPO [default = 2048] :")
+        choice = input()
+        if choice.isdigit():
+            buffer_Collect_Size = int(choice)
+        else:
+            buffer_Collect_Size = 2048
+
+        print("Number of epochs [default = 5] :")
+        choice = input()
+        if choice.isdigit():
+            num_epochs = int(choice)
+        else:
+            num_epochs = 5
+
+
         print("Number of frames per sub batch [default = 128] :")
         choice = input()
         if choice.isdigit():
@@ -661,11 +681,14 @@ while True:
         
 
         print(f"training model with {frames_per_batch} frames per batch ")
+        print(f"training model with {buffer_Collect_Size} data per epochs ")
+        print(f"training model with {num_epochs} epochs")
         print(f"training model with {sub_batch_size} frames per sub batch ")
         print(f"training model with {max_training_frames} max frames per episode")
+        print()
 
         env1 = Env()
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames,env1)
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
 
         print("Do you want to save the model : yes [1] | no [2] ")

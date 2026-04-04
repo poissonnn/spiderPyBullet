@@ -35,7 +35,7 @@ teal_medium = [64 /255, 138/255, 113/255]
 teal_dark   = [40 /255, 90 /255, 72 /255]
 teal_black  = [9  /255, 20 /255, 19 /255]
 
-Size = (14,7)
+Size = (20,14)
 
 def tensorGraphic(reward, episodeLength):
     print("graph")
