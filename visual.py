@@ -35,7 +35,7 @@ teal_medium = [64 /255, 138/255, 113/255]
 teal_dark   = [40 /255, 90 /255, 72 /255]
 teal_black  = [9  /255, 20 /255, 19 /255]
 
-Size = (20,14)
+Size = (20,20)
 
 def tensorGraphic(reward, episodeLength):
     print("graph")
@@ -109,11 +109,11 @@ def third_Tensor_Graphic(reward,
     #identify_axes(axs)
 
 
-    axs["A"].set_title("Reward Specific")
+    axs["D"].set_title("Reward Specific")
     #axs["A"].plot(specificGraphReward10,  color = [100/255, 200/255, 100/255], alpha = 0.70, linestyle = (0,(2,2.5)))
-    axs["A"].plot(specificGraphReward4,   color = teal_medium , alpha = 0.75,)
-    axs["A"].plot(specificGraphReward2,   color = teal_dark, alpha = 0.80, )
-    axs["A"].plot(specificGraphReward1_3, color = teal_black  , alpha = 0.85, )
+    axs["D"].plot(specificGraphReward4,   color = teal_medium , alpha = 0.75,)
+    axs["D"].plot(specificGraphReward2,   color = teal_dark, alpha = 0.80, )
+    axs["D"].plot(specificGraphReward1_3, color = teal_black  , alpha = 0.85, )
     #axs["A"].plot(specificGraphReward1_1, color = [100/255, 200/255, 80/255 ], alpha = 0.90, linestyle = (0,(2,2.5)))
 
     # superposer différent reward a différent moment
@@ -132,8 +132,8 @@ def third_Tensor_Graphic(reward,
     
     axs["B"].plot(XGraphRewardMean, graphRewardMean, color = red_dark, zorder = 2)
     
-    axs["D"].set_title("EpisodeLength")
-    axs["D"].plot(episodeLength, color = red_light)
+    axs["A"].set_title("EpisodeLength")
+    axs["A"].plot(episodeLength, color = red_light)
 
     axs["A"].grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
     axs["B"].grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
