@@ -38,13 +38,14 @@ class Env():
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.3
 
+
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
         self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
         self.joint_ids_second_legs = [3, 6, 9, 12] # -65 // 90 | -1.1344 // 1.5708
 
         self.clip_base_legs =   [-1.5708 , 1.5708]
-        self.clip_first_legs =  [-0.7853 , 1.2217]
-        self.clip_second_legs = [-1.1344 , 1.5708]
+        self.clip_first_legs =  [-1.2217 , 0.7854]
+        self.clip_second_legs = [-1.5708 , 1.1344]
 
         self.joint_ids = [0,1,2,3,4,5,6,7,8,9,10,11,12]
 
@@ -55,7 +56,7 @@ class Env():
 
     def build_env(self):
         # p.GUI or p.DIRECT for non-graphical version
-        physicsClient = p.connect(p.GUI)
+        physicsClient = p.connect(p.DIRECT)
         p.setGravity(0,0,-9.81)
 
         # charger les fichiers de base
@@ -122,15 +123,21 @@ class Env():
         return np.array(self.state, dtype=np.float32)
 
     def apply_action(self,action):
-
+        # 0 -> 24
         action +=1
+        # 1 -> 25
 
-        # 0 -> 23
-        if action > 12:
+        if action == 25:
+            pass
+
+        elif action > 12 and action != 25:
+            # 13 -> 24
             action -= 12
+            # 1 -> 12
             self.target[action] -= self.stepMouvement   
         
         else :
+            # 1 -> 12
             self.target[action] += self.stepMouvement   
 
         # clip all the joint depending of their joint types
@@ -149,7 +156,7 @@ class Env():
         #print(self.target)
         #print(action)
 
-    def compute_reward(self, next_state):
+    def compute_reward(self, next_state,Data):
 
         reward = 0
 
@@ -160,52 +167,63 @@ class Env():
         done = False
         self.linkState = p.getLinkState(self.spider,0)
 
+        rotation_side  = self.linkState[1][1]
+        rotation_front = self.linkState[1][0]
+        height         = self.linkState[0][2]
+        YPositon       = next_state[1]
+        YLastPosition  = Data[1]
+        YVelocity      = next_state[4]
+
+
+
+        penaltie = 7
+
+
 
         
         # fliping to the side
-        if self.linkState[1][1] > self.maxAcceptRotation or self.linkState[1][1] < -self.maxAcceptRotation:
-            reward -= abs(self.linkState[1][1])*2
-
-        # reset if flip to much
-        if self.linkState[1][1] > self.maxRotation or self.linkState[1][1] < -self.maxRotation:
-            print(self.linkState[1][1])
-            reward -= 1.5 
-            done = True
-            print("fall side")
+        if rotation_side > self.maxAcceptRotation or rotation_side < -self.maxAcceptRotation:
+            reward -= abs(rotation_side )
 
         # fliping to the front or rear
-        if self.linkState[1][0] > self.maxAcceptRotation or self.linkState[1][0] < -self.maxAcceptRotation:
-            reward -= abs(self.linkState[1][0])*2
+        if rotation_front > self.maxAcceptRotation or rotation_front < -self.maxAcceptRotation:
+            reward -= abs(rotation_front)
+
 
         # reset if flip to much
-        if self.linkState[1][0] > self.maxRotation or self.linkState[1][0] < -self.maxRotation:  
-            print(self.linkState[1][0])
-            reward -= 1.5
-            print("fall rear")
+        if rotation_side > self.maxRotation or rotation_side < -self.maxRotation:
+            #print(self.linkState[1][1])
+            reward -= penaltie
+            done = True
+            #print("fall side")
+
+        # reset if flip to much
+        if rotation_front > self.maxRotation or rotation_front < -self.maxRotation:  
+            #print(self.linkState[1][0])
+            reward -= penaltie
+            #print("fall rear")
             done = True
         
         # fall
-        if self.linkState[0][2] < 0.2:
-            reward -= 0.2
+        if self.linkState[0][2] < 0.25:
+            reward -= penaltie
+            done = True
 
         
         # stand
-        if self.linkState[0][2] > 0.5 and self.linkState[0][2] < 0.8:
+        if height > 0.5 and abs(rotation_side) < 0.1 and abs(rotation_front) < 0.1:
             
-            reward += 0.2
-            reward += next_state[4]
+            #reward += 0.1
         
+            deltaY = (YPositon - YLastPosition) * 500
+            reward += min(deltaY,4)
 
-        if next_state[1] > 3:
+        if YPositon > 3:
             won = True
-            reward += 5
+            reward += 30
         
         #print(reward)
         return reward, done,won
-
-
-
-
 
 # --- PPO ---
 
@@ -434,7 +452,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
         # choose randomly one action while taking the probability
         action_dist = torch.distributions.Categorical(action_probs)
         action = action_dist.sample().item()        # action = a
-
+        #print(action)
         #actiona=0
         env.apply_action(action)
 
@@ -462,7 +480,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         next_state = env.observe()      # next_state = s'
         
-        reward, done, won = env.compute_reward(next_state)     # reward = r
+        reward, done, won = env.compute_reward(next_state,Data)     # reward = r
         
         current_rewards.append(reward)
         graphRewards.append(reward)
@@ -470,7 +488,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
-            D_buffer.clear_buffer()
+            #D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                 episode_count_frames,
                                                                 D_buffer, env, episodes_rewards,
@@ -641,7 +659,7 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
-model1 = ActorCritic(state_dim=32, action_dim=24)
+model1 = ActorCritic(state_dim=32, action_dim=25)
 env1 = Env()
 
 while True:
@@ -673,19 +691,19 @@ while True:
         else:
             frames_per_batch = 122880
 
-        print("Size of the buffer for the PPO [default = 2048] :")
+        print("Size of the buffer for the PPO [default = 4096] :")
         choice = input()
         if choice.isdigit():
             buffer_Collect_Size = int(choice)
         else:
-            buffer_Collect_Size = 2048
+            buffer_Collect_Size = 4096
 
-        print("Number of epochs [default = 15] :")
+        print("Number of epochs [default = 10] :")
         choice = input()
         if choice.isdigit():
             num_epochs = int(choice)
         else:
-            num_epochs = 15
+            num_epochs = 10
 
         print("Number of frames per sub batch [default = 512] :")
         choice = input()
@@ -694,12 +712,12 @@ while True:
         else:
             sub_batch_size = 512
 
-        print("Max frames per episode [default = 4096] :")
+        print("Max frames per episode [default = 6144] :")
         choice = input()
         if choice.isdigit():
             max_training_frames = int(choice)
         else:
-            max_training_frames = 9192
+            max_training_frames = 6144
         
 
         print(f"training model with {frames_per_batch} frames per batch ")
@@ -713,11 +731,22 @@ while True:
         training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
 
+
+        
+        MODEL_NAME = "stand3"
+        MODEL_NAME += ".pth"
+        MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+
+        torch.save(model1.state_dict(), MODEL_SAVE_PATH)
+        print(f"save model : {MODEL_SAVE_PATH}")
+        """
+
         print("Do you want to save the model : yes [1] | no [2] ")
         choiceSave = input().strip()
         Save = choiceSave
 
-        if Save == 2:
+
+        if int(Save) == 2:
             print("model not saved :(")
         else:
             print("Choose model name :")
@@ -727,7 +756,8 @@ while True:
 
             torch.save(model1.state_dict(), MODEL_SAVE_PATH)
             print(f"save model : {MODEL_SAVE_PATH}")
-    
+        """
+
     # load
     elif QuestionAction == 2:
         print("Choose model name :")
