@@ -36,7 +36,9 @@ class Env():
         self.position = 0.0
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
-        self.maxRotation = 0.3
+        self.maxRotation = 0.4
+        self.penaltie = 2
+        self.checkpoint = 0
 
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
@@ -56,7 +58,7 @@ class Env():
 
     def build_env(self):
         # p.GUI or p.DIRECT for non-graphical version
-        physicsClient = p.connect(p.DIRECT)
+        physicsClient = p.connect(p.GUI)
         p.setGravity(0,0,-9.81)
 
         # charger les fichiers de base
@@ -71,6 +73,10 @@ class Env():
         self.obj_of_focus = self.spider
 
     def reload(self):
+
+        # reset checkpoint fot the reward
+        self.checkpoint = 0
+
         p.resetBasePositionAndOrientation(self.spider , [ 0 , 0 , 0.48 ] , [ 0 , 0 , 0 , 1 ])
 
         p.resetBaseVelocity(self.spider, [0, 0, 0], [0, 0, 0])
@@ -124,6 +130,7 @@ class Env():
 
     def apply_action(self,action):
         # 0 -> 24
+        #action = 24
         action +=1
         # 1 -> 25
 
@@ -158,8 +165,79 @@ class Env():
 
     def compute_reward(self, next_state,Data):
 
+        won = False
+        done = False
         reward = 0
+        distanceToCheckpoint = 0
 
+        self.linkState = p.getLinkState(self.spider,0)
+
+        orientation = self.linkState[1]
+        euler = p.getEulerFromQuaternion(orientation)
+
+        height         = self.linkState[0][2]
+        YPositon       = next_state[1]
+        YOldPosition  = Data[1]
+        YVelocity      = next_state[4]
+        rotation_front = euler[0]
+        rotation_side  = euler[1]
+
+        checkpoint = self.checkpoint 
+
+        if rotation_side > self.maxRotation or rotation_side < -self.maxRotation:
+            reward -= self.penaltie
+            done = True
+
+        # reset if flip to much
+        if rotation_front > self.maxRotation or rotation_front < -self.maxRotation:  
+            reward -= self.penaltie
+            done = True
+        
+        # fall
+        if self.linkState[0][2] < 0.25:
+            reward -= self.penaltie
+            done = True
+
+        if checkpoint == 0 and done != True:
+            distanceToCheckpoint = 1 - YPositon             # take the distance
+            distanceToCheckpoint = 1 - distanceToCheckpoint # invert it 
+            reward += distanceToCheckpoint / 2
+
+        elif checkpoint == 1 and done != True:
+            distanceToCheckpoint = 2 - YPositon             # take the distance
+            distanceToCheckpoint = 1 - distanceToCheckpoint # invert it 
+            reward += distanceToCheckpoint / 2
+
+        elif checkpoint == 2 and done != True:
+            distanceToCheckpoint = 3 - YPositon             # take the distance
+            distanceToCheckpoint = 1 - distanceToCheckpoint # invert it 
+            reward += distanceToCheckpoint / 2
+
+        #print(distanceToCheckpoint / 2)
+
+
+        if YPositon > 1 and checkpoint == 0 and done != True:
+            self.checkpoint = 1
+            #print(f"checkpoint : {self.checkpoint} at {YPositon} | 1")
+            reward += 5
+        
+        elif YPositon > 2 and checkpoint == 1 and done != True:
+            self.checkpoint = 2
+            #print(f"checkpoint : {self.checkpoint} at {YPositon} | 2 ")
+            reward += 10
+
+        elif YPositon > 3 and checkpoint == 2 and done != True:
+            self.checkpoint = 3
+            #print(f"checkpoint : {self.checkpoint} at {YPositon} | 3 ")
+            reward += 15
+            won = True
+
+        if height > 0.5 and abs(euler[1]) < 0.1 and abs(euler[2]) < 0.1 and done != True:
+            reward += 0.5 
+            #deltaY = (YPositon - YLastPosition) * 500
+            #reward += min(deltaY,4)
+
+        """
         #print(reward)
         
         #reward *= next_state[4]
@@ -174,13 +252,8 @@ class Env():
         YLastPosition  = Data[1]
         YVelocity      = next_state[4]
 
-
-
         penaltie = 7
 
-
-
-        
         # fliping to the side
         if rotation_side > self.maxAcceptRotation or rotation_side < -self.maxAcceptRotation:
             reward -= abs(rotation_side )
@@ -221,7 +294,7 @@ class Env():
         if YPositon > 3:
             won = True
             reward += 30
-        
+        """
         #print(reward)
         return reward, done,won
 
@@ -389,6 +462,8 @@ def PPO_loss(subdata, advantages, model1):
     
     return policy_loss
 
+
+# reset() is link to the ppo | env.reload() is the reset for the agent/environnement
 def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards, graphRewards):
     episodeLength.append(episode_count_frames)
     episode_count_frames = 0
@@ -621,20 +696,17 @@ def DEBUG(env):
 
         linkState = p.getLinkState(env.spider,0)
 
+        orientation = linkState[1]
+        height = linkState[0][2]
+        minHeight = 0.4
 
-        if linkState[1][1] > 0.2 or linkState[1][1] < -0.2:
-            #print(linkState[1][1])
-            reward = -abs(linkState[1][1])
-            print(reward)
+        if minHeight > height:
+            height_penalty = -abs(minHeight - height) * 3
 
-        if linkState[1][0] > 0.2 or linkState[1][0] < -0.2:
-            #print(linkState[1][0])
-            reward = -abs(linkState[1][0])
-            print(reward)
-
-        if linkState[0][2] < 0.2 :
-            print(linkState[0][2])
-
+        euler = p.getEulerFromQuaternion(orientation)
+        print(round(euler[0],2))
+        print(round(euler[1],2))
+        print(round(euler[2],2))
         """
         if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
             print(linkState[0][2])
@@ -733,7 +805,7 @@ while True:
 
 
         
-        MODEL_NAME = "stand3"
+        MODEL_NAME = "tempo"
         MODEL_NAME += ".pth"
         MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
 
