@@ -209,7 +209,7 @@ class Env():
         #print(self.target)
         #print(action)
 
-    def compute_reward(self, next_state,Data):
+    def compute_reward(self, next_state,old_state):
 
         won = False
         done = False
@@ -231,9 +231,18 @@ class Env():
         distanceZ = next_state[8]
 
         distance = math.sqrt(distanceX**2 + distanceY**2 + distanceZ**2)
-        print(distance)
+        #print(distance)
 
-        reward += distance
+        OldDistanceX = old_state[6]
+        OldDistanceY = old_state[7]
+        OldDistanceZ = old_state[8]
+
+        OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2 + OldDistanceZ**2)
+        #print(OldDistance)
+
+        delta = (OldDistance - distance)*500
+
+        reward += delta
 
         # reset if he flip to much
         if rotation_side > self.maxRotation or rotation_side < -self.maxRotation:
@@ -253,6 +262,12 @@ class Env():
             reward += 0.5 
             #deltaY = (YPositon - YLastPosition) * 500
             #reward += min(deltaY,4)
+
+        if distance < 2.5 and done != True:
+            reward += 10
+            won = True
+
+        #done = False
 
         #print(reward)
         return reward, done,won
@@ -498,7 +513,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
         
         focus_position , _ = p.getBasePositionAndOrientation(env.spider)
             
-        p.resetDebugVisualizerCamera(cameraDistance=10,
+        p.resetDebugVisualizerCamera(cameraDistance=15,
                                     cameraYaw=0,
                                     cameraPitch=-40,
                                     cameraTargetPosition = focus_position)
@@ -512,7 +527,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
         log_prob = action_dist.log_prob(torch.tensor(action, dtype=torch.int64)).item()
 
         next_state = env.observe()      # next_state = s'
-        
+
         reward, done, won = env.compute_reward(next_state,Data)     # reward = r
         
         current_rewards.append(reward)
