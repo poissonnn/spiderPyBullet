@@ -37,7 +37,7 @@ class Env():
         self.position = 0.0
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
-        self.maxRotation = 0.4
+        self.maxRotation = 0.8
         self.penaltie = 2
 
         self.size = 10
@@ -152,12 +152,22 @@ class Env():
         """
         distanceX = abs(self.goalPosition[0] - self.spiderPosition[0])
         distanceY = abs(self.goalPosition[1] - self.spiderPosition[1])
-        distanceZ = abs(self.goalPosition[2] - self.spiderPosition[2])
+        #distanceZ = abs(self.goalPosition[2] - self.spiderPosition[2])
 
+        self.linkState = p.getLinkState(self.spider,0)
+
+        orientation = self.linkState[1]
+        euler = p.getEulerFromQuaternion(orientation)
+
+        # variable for the fall and flip detection
+        rotation_pitch = euler[1]
+        rotation_roll  = euler[0]
+        rotation_yaw   = euler[2]
 
         self.state = [self.spiderPosition[0], self.spiderPosition[1], self.spiderPosition[2],
                       self.linearVelocity[0], self.linearVelocity[1], self.linearVelocity[2],
-                      distanceX             , distanceY             , distanceZ             ,]
+                      distanceX             , distanceY             , 
+                      rotation_pitch        , rotation_roll         , rotation_yaw]
 
         """
         for i in range(p.getNumJoints(spider)):
@@ -176,7 +186,7 @@ class Env():
 
     def apply_action(self,action):
         # 0 -> 24
-        #action = 24
+        action = 24
         action +=1
         # 1 -> 25
 
@@ -222,46 +232,53 @@ class Env():
 
         # variable for the fall and flip detection
         height         = self.linkState[0][2]
-        rotation_front = euler[0]
-        rotation_side  = euler[1]
+        rotation_pitch = euler[1]
+        rotation_roll  = euler[0]
+        #rotation_yaw   = euler[2]
 
         # variable for the deplacement detection
         distanceX = next_state[6]
         distanceY = next_state[7]
-        distanceZ = next_state[8]
+        #distanceZ = next_state[8]
 
-        distance = math.sqrt(distanceX**2 + distanceY**2 + distanceZ**2)
+        distance = math.sqrt(distanceX**2 + distanceY**2)
         #print(distance)
 
         OldDistanceX = old_state[6]
         OldDistanceY = old_state[7]
-        OldDistanceZ = old_state[8]
+        #OldDistanceZ = old_state[8]
 
-        OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2 + OldDistanceZ**2)
+        OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
         #print(OldDistance)
 
-        delta = (OldDistance - distance)*500
+        delta = (OldDistance - distance) * 200
+        delta = max(delta, -3)
+        print(f"delta  : {delta}")
+        reward -= 0.01
 
+        #reward += delta
         reward += delta
 
-        # reset if he flip to much
-        if rotation_side > self.maxRotation or rotation_side < -self.maxRotation:
+        # reset for high roll
+        if rotation_roll > self.maxRotation or rotation_roll < -self.maxRotation:
             reward -= self.penaltie
             done = True
-        if rotation_front > self.maxRotation or rotation_front < -self.maxRotation:  
+
+        # reset for high pitch
+        if rotation_pitch > self.maxRotation or rotation_pitch < -self.maxRotation:  
             reward -= self.penaltie
             done = True
-        
+        """
         # reset if he fall
-        if self.linkState[0][2] < 0.25:
+        if self.linkState[0][2] < 0.15:
             reward -= self.penaltie
             done = True
-
-
-        if height > 0.5 and abs(euler[1]) < 0.1 and abs(euler[2]) < 0.1 and done != True:
-            reward += 0.5 
+        """
+        """
+        if height > 0.3 and done != True:
+            reward += 0.05 
             #deltaY = (YPositon - YLastPosition) * 500
-            #reward += min(deltaY,4)
+        """
 
         if distance < 2.5 and done != True:
             reward += 10
@@ -269,8 +286,8 @@ class Env():
 
         #done = False
 
-        #print(reward)
-        return reward, done,won
+        print(f"reward : {reward}")
+        return reward, done, won
 
 # --- PPO ---
 
@@ -443,7 +460,6 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     episodes_rewards.append(current_rewards)
     current_rewards = []
     env.reload()
-    
     """
     visual.third_Tensor_Graphic(graphRewards,
                                 episodeLength,
@@ -482,6 +498,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         # limit episode length
         if episode_count_frames >= max_training_frames:
+            D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                             episode_count_frames,
                                                                             D_buffer, env, episodes_rewards,
@@ -536,7 +553,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
-            #D_buffer.clear_buffer()
+            D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                 episode_count_frames,
                                                                 D_buffer, env, episodes_rewards,
@@ -594,7 +611,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
         episode_count_frames = episode_count_frames +1
         total_count_frame = total_count_frame + 1
 
-        if total_count_frame % max_training_frames*4 == 0:
+        if total_count_frame % max_training_frames*2 == 0:
             print(f"frame count : {total_count_frame}")
             
 
@@ -607,7 +624,18 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
     visual.third_Tensor_Graphic(graphRewards,
                                 episodeLength,
                                 episodes_rewards)
+    graphRewardMean = []
+
+    episodes_rewards = []
+    current_rewards = []
+    graphRewards = []
     
+    episodeLength = []
+
+    Won = 0
+
+    total_count_frame = 0
+    episode_count_frames = 0
 
 
 def DEBUG(env):
@@ -678,9 +706,9 @@ def DEBUG(env):
             height_penalty = -abs(minHeight - height) * 3
 
         euler = p.getEulerFromQuaternion(orientation)
-        #print(round(euler[0],2))
-        #print(round(euler[1],2))
-        #print(round(euler[2],2))
+        print(f"roll  : {round(radian(euler[1]), 1)}")
+        print(f"pitch : {round(radian(euler[0]), 1)}")
+        print(f"yaw   : {round(radian(euler[2]), 1)}")
         """
         if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
             print(linkState[0][2])
@@ -705,7 +733,7 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
-model1 = ActorCritic(state_dim=35, action_dim=25)
+model1 = ActorCritic(state_dim=37, action_dim=24)
 env1 = Env()
 
 while True:
@@ -730,12 +758,12 @@ while True:
     elif QuestionAction == 1:
         print("\nGo for training")
 
-        print("Number of frames per batch [default = 122k] :")
+        print("Number of frames per batch [default = 131] :")
         choice = input()
         if choice.isdigit():
             frames_per_batch = int(choice) * 1000
         else:
-            frames_per_batch = 122880
+            frames_per_batch = 13172
 
         print("Size of the buffer for the PPO [default = 4096] :")
         choice = input()
@@ -758,12 +786,12 @@ while True:
         else:
             sub_batch_size = 512
 
-        print("Max frames per episode [default = 6144] :")
+        print("Max frames per episode [default = 16384] :")
         choice = input()
         if choice.isdigit():
             max_training_frames = int(choice)
         else:
-            max_training_frames = 80000
+            max_training_frames = 16384
         
 
         print(f"training model with {frames_per_batch} frames per batch ")
