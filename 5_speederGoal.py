@@ -186,7 +186,7 @@ class Env():
 
     def apply_action(self,action):
         # 0 -> 24
-        action = 24
+        #action = 24
         action +=1
         # 1 -> 25
 
@@ -251,10 +251,10 @@ class Env():
         OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
         #print(OldDistance)
 
-        delta = (OldDistance - distance) * 200
+        delta = (OldDistance - distance) * 100
         delta = max(delta, -3)
-        print(f"delta  : {delta}")
-        reward -= 0.01
+        #print(f"delta  : {delta}")
+        #reward -= 0.005
 
         #reward += delta
         reward += delta
@@ -286,13 +286,13 @@ class Env():
 
         #done = False
 
-        print(f"reward : {reward}")
+        #print(f"reward : {reward}")
         return reward, done, won
 
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
-lr = 0.001
+lr = 0.01
 max_grad_norm = 1.0
 
 clip_epsilon = (0.3) # value of the PPO loss
