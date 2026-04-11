@@ -39,6 +39,7 @@ class Env():
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
         self.penaltie = 2
+        self.checkpoint = 0
 
         self.size = 10
         self.border = 5
@@ -79,6 +80,9 @@ class Env():
 
     def reload(self):
 
+        self.checkpoint = 0
+
+        # --- GOAL RESET ---
         aabb = p.getAABB(self.goal)
         goalHeight = aabb[1][2] - aabb[0][2]
 
@@ -86,6 +90,8 @@ class Env():
         goalY = 0
 
         number = 0
+        # goal spawn at a distance from the center 
+        # avoid the goal to spawn on the spider
         while number == 0:
             #print("random")
             temporaryX = random.uniform(-self.size, self.size)
@@ -185,15 +191,13 @@ class Env():
         return np.array(self.state, dtype=np.float32)
 
     def apply_action(self,action):
-        # 0 -> 24
+        # 0 -> 23
         #action = 24
         action +=1
-        # 1 -> 25
+        # 1 -> 24
 
-        if action == 25:
-            pass
 
-        elif action > 12 and action != 25:
+        if action > 12 :
             # 13 -> 24
             action -= 12
             # 1 -> 12
@@ -225,6 +229,10 @@ class Env():
         done = False
         reward = 0
 
+        distanceToCheckpoint = 0
+        checkpoint = self.checkpoint
+
+        # get base orientation for the flip check
         self.linkState = p.getLinkState(self.spider,0)
 
         orientation = self.linkState[1]
@@ -241,6 +249,7 @@ class Env():
         distanceY = next_state[7]
         #distanceZ = next_state[8]
 
+        # -- delta calculation --
         distance = math.sqrt(distanceX**2 + distanceY**2)
         #print(distance)
 
@@ -254,11 +263,9 @@ class Env():
         delta = (OldDistance - distance) * 100
         delta = max(delta, -3)
         #print(f"delta  : {delta}")
-        #reward -= 0.005
-
         #reward += delta
-        reward += delta
 
+        # -- pitch/roll/height check --
         # reset for high roll
         if rotation_roll > self.maxRotation or rotation_roll < -self.maxRotation:
             reward -= self.penaltie
@@ -268,21 +275,29 @@ class Env():
         if rotation_pitch > self.maxRotation or rotation_pitch < -self.maxRotation:  
             reward -= self.penaltie
             done = True
-        """
-        # reset if he fall
-        if self.linkState[0][2] < 0.15:
-            reward -= self.penaltie
-            done = True
-        """
-        """
-        if height > 0.3 and done != True:
-            reward += 0.05 
-            #deltaY = (YPositon - YLastPosition) * 500
-        """
 
-        if distance < 2.5 and done != True:
-            reward += 10
-            won = True
+        # -- distance check --
+
+        if not done :
+            if distance > 1 and checkpoint == 0:
+                checkpoint = 1
+                reward += 5 
+                print("checkpoint 1")
+
+            if distance > 2 and checkpoint == 0:
+                checkpoint = 2
+                reward += 10 
+                print("checkpoint 2")
+
+            if distance > 3 and checkpoint == 0:
+                checkpoint = 3
+                reward += 15 
+                print("checkpoint 3")
+
+            # win
+            if distance < 2.5 :
+                reward += 10
+                won = True
 
         #done = False
 
@@ -469,7 +484,7 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     #print(f"Over {max_training_frames} frames : reset")
 
 
-def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
+def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env, buffer_Collect_Size, num_epochs,debug):
     D_buffer = buffer()
     env.reload()
     optimizer = optim.Adam(model1.parameters(), lr=lr)
@@ -518,7 +533,8 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
         action_dist = torch.distributions.Categorical(action_probs)
         action = action_dist.sample().item()        # action = a
         #print(action)
-        #actiona=0
+        if debug :
+            action = 24
         env.apply_action(action)
 
         # update the joint position
@@ -568,7 +584,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
             print(" - - DONE - - ")
 
         # learning loop
-        if len(D_buffer.buffer) >= buffer_Collect_Size:
+        if len(D_buffer.buffer) >= buffer_Collect_Size and not debug:
             subdata = D_buffer.sample(sub_batch_size)
 
             # calculate the amount of reward the model should get
@@ -737,7 +753,7 @@ model1 = ActorCritic(state_dim=37, action_dim=24)
 env1 = Env()
 
 while True:
-    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3]")
+    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | train debug [4]")
     
     choice = input().strip()
 
@@ -793,16 +809,18 @@ while True:
         else:
             max_training_frames = 16384
         
+        debug = False
 
         print(f"training model with {frames_per_batch} frames per batch ")
         print(f"training model with {buffer_Collect_Size} data per epochs ")
         print(f"training model with {num_epochs} epochs")
         print(f"training model with {sub_batch_size} frames per sub batch ")
         print(f"training model with {max_training_frames} max frames per episode")
+        print(f"debug : {debug}")
         print()
 
         
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs, debug)
 
 
 
@@ -849,5 +867,25 @@ while True:
         print("DEBUG")
         DEBUG(env1)
 
+    elif QuestionAction == 4:
+
+        frames_per_batch = 80000
+        buffer_Collect_Size = 4096
+        num_epochs = 10
+        sub_batch_size = 512
+        max_training_frames = 80000
+        debug = True
+        
+
+        print(f"training model with {frames_per_batch} frames per batch ")
+        print(f"training model with {buffer_Collect_Size} data per epochs ")
+        print(f"training model with {num_epochs} epochs")
+        print(f"training model with {sub_batch_size} frames per sub batch ")
+        print(f"training model with {max_training_frames} max frames per episode")
+        print(f"debug : {debug}")
+        print()
+
+        
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs, debug)       
     
 p.disconnect()
