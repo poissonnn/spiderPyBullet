@@ -38,7 +38,7 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 2
+        self.penaltie = 6
         self.checkpoint = 0
 
         self.size = 10
@@ -236,6 +236,7 @@ class Env():
 
         firstDistanceGoal = self.reload_Distance
 
+        distance90Percent = firstDistanceGoal * (90/100)
         distance80Percent = firstDistanceGoal * (80/100)
         distance65Percent = firstDistanceGoal * (65/100)
         distance50Percent = firstDistanceGoal * (50/100)
@@ -257,7 +258,7 @@ class Env():
         distanceX = nextState[6]
         distanceY = nextState[7]
 
-        # -- delta calculation --
+        # --- delta calculation ---
         distance = math.sqrt(distanceX**2 + distanceY**2)
         #print(distance)
 
@@ -266,12 +267,12 @@ class Env():
 
         OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
 
-        delta = (OldDistance - distance) * 100
+        delta = (OldDistance - distance) * 1000
         delta = max(delta, -3)
         #print(f"delta  : {delta}")
-        #reward += delta
+        reward += delta
 
-        # -- pitch/roll/height check --
+        # --- pitch/roll/height check ---
         # reset for high roll
         if rotationRoll > self.maxRotation or rotationRoll < -self.maxRotation:
             reward -= self.penaltie
@@ -282,10 +283,10 @@ class Env():
             reward -= self.penaltie
             done = True
 
-        # -- distance check --
-
+        # --- distance check ---
         if not done :
             """
+            print(f"distance90 : {distance90Percent}")
             print(f"distance80 : {distance80Percent}")
             print(f"distance65 : {distance65Percent}")
             print(f"distance50 : {distance50Percent}")
@@ -293,36 +294,38 @@ class Env():
             
             print(f"distance : {distance}")
             """
-
-            if distance < distance80Percent and self.checkpoint == 0:
+            if distance < distance90Percent and self.checkpoint == 0:
                 self.checkpoint = 1
-                reward += 5 
+                reward += 2 
                 
                 print("checkpoint 1")
 
-            if distance < distance65Percent and self.checkpoint == 1:
+            if distance < distance80Percent and self.checkpoint == 1:
                 self.checkpoint = 2
                 reward += 10 
-
+                
                 print("checkpoint 2")
 
-            if distance < distance50Percent and self.checkpoint == 2:
+            if distance < distance65Percent and self.checkpoint == 2:
                 self.checkpoint = 3
                 reward += 15 
+
                 print("checkpoint 3")
-            
-            if distance < distance35Percent and self.checkpoint == 3:
+
+            if distance < distance50Percent and self.checkpoint == 3:
                 self.checkpoint = 4
-                reward += 20
+                reward += 20 
                 print("checkpoint 4")
+            
+            if distance < distance35Percent and self.checkpoint == 4:
+                self.checkpoint = 5
+                reward += 20
+                print("checkpoint 5")
 
             # win
             if distance < 2.5 :
                 reward += 10
                 won = True
-
-        #done = False
-        reward = 0
 
         #print(f"reward : {reward}")
         return reward, done, won

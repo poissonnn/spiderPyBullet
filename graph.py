@@ -23,29 +23,27 @@ Size = (20,20)
 
 fig, axs = plt.subplots(1,1,figsize=Size)
 
-SizeGraph = 2.5
+SizeGraph = 12
 N = 1000
 
-size = 2
-border = 1
+size = 10
+border = 7
 
 
 
 x = []
 y = []
 number = 0
-while number == 0:
-    print("random")
-    temporaryX = random.uniform(-2, 2)
-    temporaryY = random.uniform(-2, 2)
+while number < 5000:
+    #print("random")
+    temporaryX = random.uniform(-size, size)
+    temporaryY = random.uniform(-size, size)
 
     if temporaryY < -border or temporaryY > border or temporaryX < -border or temporaryX > border:
-        print("graph")
+        #print("graph")
         x.append(temporaryX)
         y.append(temporaryY)
         number += 1
-
-
 
 
 
