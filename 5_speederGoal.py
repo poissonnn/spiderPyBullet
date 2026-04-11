@@ -38,7 +38,8 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 6
+        self.penaltie = 50
+        self.goalReward = 4
         self.checkpoint = 0
 
         self.size = 10
@@ -61,7 +62,7 @@ class Env():
 
     def build_env(self):
         # p.GUI or p.DIRECT for non-graphical version
-        physicsClient = p.connect(p.GUI)
+        self.physicsClient = p.connect(p.GUI)
         p.setGravity(0,0,-9.81)
 
         # charger les fichiers de base
@@ -250,27 +251,34 @@ class Env():
         euler = p.getEulerFromQuaternion(orientation)
 
         # variable for the fall and flip detection
-        height         = self.linkState[0][2]
+        height        = self.linkState[0][2]
         rotationPitch = euler[1]
         rotationRoll  = euler[0]
 
+
+        # --- delta calculation ---
         # variable for the deplacement detection
         distanceX = nextState[6]
         distanceY = nextState[7]
 
-        # --- delta calculation ---
         distance = math.sqrt(distanceX**2 + distanceY**2)
-        #print(distance)
 
         OldDistanceX = oldState[6]
         OldDistanceY = oldState[7]
 
         OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
 
-        delta = (OldDistance - distance) * 1000
-        delta = max(delta, -3)
+
+        delta = (OldDistance - distance)*100
+        #delta = min(delta, 3)
         #print(f"delta  : {delta}")
-        reward += delta
+        #reward += delta
+
+        distanceDone = firstDistanceGoal - distance
+
+        if delta > 0 and delta < 1.5:
+            reward += distanceDone
+        
 
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -296,35 +304,35 @@ class Env():
             """
             if distance < distance90Percent and self.checkpoint == 0:
                 self.checkpoint = 1
-                reward += 2 
+                reward += self.goalReward
                 
                 print("checkpoint 1")
 
             if distance < distance80Percent and self.checkpoint == 1:
                 self.checkpoint = 2
-                reward += 10 
+                reward += self.goalReward * 1.5
                 
                 print("checkpoint 2")
 
             if distance < distance65Percent and self.checkpoint == 2:
                 self.checkpoint = 3
-                reward += 15 
+                reward += self.goalReward * 2
 
                 print("checkpoint 3")
 
             if distance < distance50Percent and self.checkpoint == 3:
                 self.checkpoint = 4
-                reward += 20 
+                reward += self.goalReward * 3
                 print("checkpoint 4")
             
             if distance < distance35Percent and self.checkpoint == 4:
                 self.checkpoint = 5
-                reward += 20
+                reward += self.goalReward * 4
                 print("checkpoint 5")
 
             # win
             if distance < 2.5 :
-                reward += 10
+                reward += self.goalReward * 5
                 won = True
 
         #print(f"reward : {reward}")
@@ -337,7 +345,7 @@ lr = 0.01
 max_grad_norm = 1.0
 
 clip_epsilon = (0.3) # value of the PPO loss
-gamma = 0.99
+gamma = 0.999
 lmbda = 0.95
 entropy_eps = 0.01
 
@@ -347,30 +355,36 @@ class ActorCritic(nn.Module):
 
         # X depends on the state_dim and actio_dim
         # X = 32
-        # X input -> 256 hidden neurone -> 256 hidden neurone -> 128 hidden neurone
+        # X input -> 256 hidden neurone -> 256 hidden neurone -> 256 hidden neurone
         # this is a common part and divided to actor and to critic
         self.shared_layers = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim ),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim // 2 ),
+            nn.Linear(hidden_dim, hidden_dim  ),
             nn.ReLU()
         )
 
-        # 128 hidden neurone -> 64 hidden neurone -> X probability with the softmax
+        # 256 hidden neurone -> 128 hidden neurone -> 64 hidden neurone -> X probability with the softmax
         self.actor = nn.Sequential(
+            nn.Linear(hidden_dim , hidden_dim // 2 ),
+            nn.ReLU(),
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
             nn.Linear(hidden_dim // 4, action_dim),
             nn.Softmax(dim=-1)
         )
 
-        # 128 hidden neurone -> 64 hidden neurone -> 1 estimation of how many point the future ia can win
+        # 256 hidden neurone -> 128 hidden neurone -> 64 hidden neurone -> 32 hidden neurone -> 1 estimation of how many point the future ia can win
         self.critic = nn.Sequential(
+            nn.Linear(hidden_dim , hidden_dim // 2 ),
+            nn.ReLU(),
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 4, 1)
+            nn.Linear(hidden_dim // 4, hidden_dim // 8 ),
+            nn.ReLU(),
+            nn.Linear(hidden_dim // 8, 1)
         )
 
     def forward(self, x):
@@ -600,7 +614,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
                                                                 current_rewards, graphRewards)
 
         elif won:
-            D_buffer.clear_buffer()
+            #D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                             episode_count_frames,
                                                                             D_buffer, env, episodes_rewards,
@@ -777,9 +791,19 @@ def DEBUG(env):
 
 model1 = ActorCritic(state_dim=38, action_dim=24)
 env1 = Env()
+#env2 = Env()
+"""
+frames_per_batch = 131720
+buffer_Collect_Size = 8192
+num_epochs = 15
+sub_batch_size = 512
+max_training_frames = 8192
+training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+training(frames_per_batch, sub_batch_size, model1, max_training_frames, env2, buffer_Collect_Size, num_epochs)
+"""
 
 while True:
-    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] ")
+    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
     choice = input().strip()
 
@@ -798,43 +822,50 @@ while True:
 
     # train
     elif QuestionAction == 1:
+
+        frames_per_batch = 131720
+        buffer_Collect_Size = 8192
+        num_epochs = 15
+        sub_batch_size = 512
+        max_training_frames = 8192
+
         print("\nGo for training")
 
-        print("Number of frames per batch [default = 131720] :")
+        print(f"Number of frames per batch [default = {frames_per_batch}] :")
         print("Input is multiplie by 1000")
         choice = input()
         if choice.isdigit():
             frames_per_batch = int(choice) * 1000
         else:
-            frames_per_batch = 131720
+            frames_per_batch = frames_per_batch
 
-        print("Size of the buffer for the PPO [default = 4096] :")
+        print(f"Size of the buffer for the PPO [default = {buffer_Collect_Size}] :")
         choice = input()
         if choice.isdigit():
             buffer_Collect_Size = int(choice)
         else:
-            buffer_Collect_Size = 4096
+            buffer_Collect_Size = buffer_Collect_Size
 
-        print("Number of epochs [default = 10] :")
+        print(f"Number of epochs [default = {num_epochs}] :")
         choice = input()
         if choice.isdigit():
             num_epochs = int(choice)
         else:
-            num_epochs = 10
+            num_epochs = num_epochs
 
-        print("Number of frames per sub batch [default = 512] :")
+        print(f"Number of frames per sub batch [default = {sub_batch_size}] :")
         choice = input()
         if choice.isdigit():
             sub_batch_size = int(choice)
         else:
-            sub_batch_size = 512
+            sub_batch_size = sub_batch_size
 
-        print("Max frames per episode [default = 16384] :")
+        print(f"Max frames per episode [default = {max_training_frames}] :")
         choice = input()
         if choice.isdigit():
             max_training_frames = int(choice)
         else:
-            max_training_frames = 16384
+            max_training_frames = max_training_frames
 
         print(f"training model with {frames_per_batch} frames per batch ")
         print(f"training model with {buffer_Collect_Size} data per epochs ")
@@ -886,6 +917,14 @@ while True:
     elif QuestionAction == 3:
         print("DEBUG")
         DEBUG(env1)
+
+    elif QuestionAction == 4:
+        frames_per_batch = 131720
+        buffer_Collect_Size = 8192
+        num_epochs = 15
+        sub_batch_size = 512
+        max_training_frames = 8192
+        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
 
 p.disconnect()
