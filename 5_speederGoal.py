@@ -38,8 +38,8 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 50
-        self.goalReward = 4
+        self.penaltie = 2
+        self.goalReward = 2
         self.checkpoint = 0
 
         self.size = 10
@@ -269,15 +269,14 @@ class Env():
         OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
 
 
-        delta = (OldDistance - distance)*100
+        #delta = (OldDistance - distance)*100
         #delta = min(delta, 3)
         #print(f"delta  : {delta}")
         #reward += delta
 
         distanceDone = firstDistanceGoal - distance
 
-        if delta > 0 and delta < 1.5:
-            reward += distanceDone
+        reward += distanceDone
         
 
         # --- pitch/roll/height check ---
@@ -919,12 +918,45 @@ while True:
         DEBUG(env1)
 
     elif QuestionAction == 4:
-        frames_per_batch = 131720
-        buffer_Collect_Size = 8192
+        print("Choose model name :")
+
+        MODEL_NAME = input()
+        MODEL_NAME += ".pth"
+        MODEL_LOAD_PATH = os.path.join(path, MODEL_NAME)
+
+        model1.load_state_dict(torch.load(MODEL_LOAD_PATH))
+        model1.eval()
+        print("Model loaded successfully!")
+
+
+        frames_per_batch = 10_000_000
+        buffer_Collect_Size = 2048
         num_epochs = 15
         sub_batch_size = 512
         max_training_frames = 8192
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+
+        chunk = 80
+        divide = frames_per_batch//chunk
+        print(divide)
+        print(chunk)
+
+        for i in range(divide):
+            training(divide, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+            
+            MODEL_NAME = str(i)
+            MODEL_NAME += ".pth"
+            MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+
+            torch.save(model1.state_dict(), MODEL_SAVE_PATH)
+            print(f"save model : {MODEL_SAVE_PATH}")
+
+            MODEL_NAME = str(i)
+            MODEL_NAME += ".pth"
+            MODEL_LOAD_PATH = os.path.join(path, MODEL_NAME)
+
+            model1.load_state_dict(torch.load(MODEL_LOAD_PATH))
+            model1.eval()
+            print("Model loaded successfully!")
 
 
 p.disconnect()
