@@ -2,10 +2,7 @@
 #import AutoPyPack
 import pybullet as p
 import pybullet_data
-from multiprocessing import Process, Queue
-
 from dataclasses import dataclass
-import threading
 
 import os
 import time
@@ -42,8 +39,9 @@ class Env():
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
         self.penaltie = 2
-        self.goalReward = 4
+        self.goalReward = 2
         self.checkpoint = 0
+        self.checkpointMultiplier = 1
 
         self.size = 10
         self.border = 7
@@ -65,7 +63,7 @@ class Env():
 
     def build_env(self):
         # p.GUI or p.DIRECT for non-graphical version
-        physicsClient = p.connect(p.DIRECT)
+        self.physicsClient = p.connect(p.GUI)
         p.setGravity(0,0,-9.81)
 
         # charger les fichiers de base
@@ -162,8 +160,8 @@ class Env():
         self.goalPosition, _ = p.getBasePositionAndOrientation(self.goal)
         
 
-        distanceX = abs(self.goalPosition[0] - self.spiderPosition[0])
-        distanceY = abs(self.goalPosition[1] - self.spiderPosition[1])
+        distanceX = self.goalPosition[0] - self.spiderPosition[0]
+        distanceY = self.goalPosition[1] - self.spiderPosition[1]
         distance = math.sqrt(distanceX**2 + distanceY**2)
 
 
@@ -232,114 +230,33 @@ class Env():
             elif i in self.joint_ids_second_legs:
                 self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
 
-    def compute_reward(self, nextState,oldState):
-
+    def compute_reward(self, nextState, oldState):
         won = False
         done = False
         reward = 0
 
-        firstDistanceGoal = self.reload_Distance
+        # distance actuelle et ancienne
+        distance    = math.sqrt(nextState[6]**2 + nextState[7]**2)
+        oldDistance = math.sqrt(oldState[6]**2  + oldState[7]**2)
 
-        distance90Percent = firstDistanceGoal * (90/100)
-        distance80Percent = firstDistanceGoal * (80/100)
-        distance65Percent = firstDistanceGoal * (65/100)
-        distance50Percent = firstDistanceGoal * (50/100)
-        distance35Percent = firstDistanceGoal * (35/100)
+        # signal dense : se rapprocher = positif, s'éloigner = négatif
+        delta = (oldDistance - distance) * 10
+        reward += delta
 
+        # pénalité si il tombe
+        rotationRoll  = nextState[9]
+        rotationPitch = nextState[10]
 
-        # get base orientation for the flip check
-        self.linkState = p.getLinkState(self.spider,0)
-
-        orientation = self.linkState[1]
-        euler = p.getEulerFromQuaternion(orientation)
-
-        # variable for the fall and flip detection
-        height        = self.linkState[0][2]
-        rotationPitch = euler[1]
-        rotationRoll  = euler[0]
-
-
-        # --- delta calculation ---
-        # variable for the deplacement detection
-        distanceX = nextState[6]
-        distanceY = nextState[7]
-
-        distance = math.sqrt(distanceX**2 + distanceY**2)
-
-        OldDistanceX = oldState[6]
-        OldDistanceY = oldState[7]
-
-        OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
-
-
-        delta = (OldDistance - distance)*100
-        #delta = min(delta, 3)
-        #print(f"delta  : {delta}")
-        #reward += delta
-
-        distanceDone = firstDistanceGoal - distance
-
-        reward += min(distanceDone,4.0)
-        
-
-        # --- pitch/roll/height check ---
-        # reset for high roll
-        if rotationRoll > self.maxRotation or rotationRoll < -self.maxRotation:
-            reward -= self.penaltie
+        if abs(rotationRoll) > self.maxRotation or abs(rotationPitch) > self.maxRotation:
+            reward -= 5
             done = True
 
-        # reset for high pitch
-        if rotationPitch > self.maxRotation or rotationPitch < -self.maxRotation:  
-            reward -= self.penaltie
-            done = True
+        # win
+        if distance < 2.5:
+            reward += 50
+            won = True
 
-        # --- distance check ---
-        if not done :
-            """
-            print(f"distance90 : {distance90Percent}")
-            print(f"distance80 : {distance80Percent}")
-            print(f"distance65 : {distance65Percent}")
-            print(f"distance50 : {distance50Percent}")
-            print(f"distance35 : {distance35Percent}")
-            
-            print(f"distance : {distance}")
-            """
-            if distance < distance90Percent and self.checkpoint == 0:
-                self.checkpoint = 1
-                reward += self.goalReward
-                
-                print("checkpoint 1")
-
-            if distance < distance80Percent and self.checkpoint == 1:
-                self.checkpoint = 2
-                reward += self.goalReward * 1.5
-                
-                print("checkpoint 2")
-
-            if distance < distance65Percent and self.checkpoint == 2:
-                self.checkpoint = 3
-                reward += self.goalReward * 2
-
-                print("checkpoint 3")
-
-            if distance < distance50Percent and self.checkpoint == 3:
-                self.checkpoint = 4
-                reward += self.goalReward * 3
-                print("checkpoint 4")
-            
-            if distance < distance35Percent and self.checkpoint == 4:
-                self.checkpoint = 5
-                reward += self.goalReward * 4
-                print("checkpoint 5")
-
-            # win
-            if distance < 2.5 :
-                reward += self.goalReward * 5
-                won = True
-
-        #print(f"reward : {reward}")
         return reward, done, won
-
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
@@ -349,7 +266,7 @@ max_grad_norm = 1.0
 clip_epsilon = (0.3) # value of the PPO loss
 gamma = 0.999
 lmbda = 0.95
-entropy_eps = 0.05
+entropy_eps = 0.01
 
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim = 256):
@@ -526,10 +443,10 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     #print(f"Over {max_training_frames} frames : reset")
 
 
-def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
+def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
     D_buffer = buffer()
     env.reload()
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optimizerAdam
 
     graphRewardMean = []
 
@@ -562,8 +479,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
                                                                             current_rewards, graphRewards)
 
         # take info
-        # data = state = s
-        Data = env.observe()          
+        Data = env.observe()          # data = state = s
 
         # put in tensor for the model
         state_tensor = torch.tensor(Data, dtype=torch.float32)
@@ -610,14 +526,14 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
-            D_buffer.clear_buffer()
+            #D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                 episode_count_frames,
                                                                 D_buffer, env, episodes_rewards,
                                                                 current_rewards, graphRewards)
 
         elif won:
-            D_buffer.clear_buffer()
+            #D_buffer.clear_buffer()
             episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
                                                                             episode_count_frames,
                                                                             D_buffer, env, episodes_rewards,
@@ -656,7 +572,7 @@ def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env,
                     # calculate the loss of the policy for the critic
                     value_loss = compute_value_loss(mini_batch, returns_batch, model1)
 
-                    loss = policy_loss + value_loss * 0.5
+                    loss = policy_loss + value_loss 
                     #print(loss)
                     
                     loss.backward()
@@ -792,13 +708,24 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
+
 model1 = ActorCritic(state_dim=38, action_dim=24)
+optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
-
+#env2 = Env()
+"""
+frames_per_batch = 131720
+buffer_Collect_Size = 8192
+num_epochs = 15
+sub_batch_size = 512
+max_training_frames = 8192
+training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+training(frames_per_batch, sub_batch_size, model1, max_training_frames, env2, buffer_Collect_Size, num_epochs)
+"""
 
 while True:
-    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multiTrain [4] ")
+    print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
     choice = input().strip()
 
@@ -819,7 +746,7 @@ while True:
     elif QuestionAction == 1:
 
         frames_per_batch = 131720
-        buffer_Collect_Size = 8192
+        buffer_Collect_Size = 4096
         num_epochs = 15
         sub_batch_size = 512
         max_training_frames = 8192
@@ -869,7 +796,7 @@ while True:
         print(f"training model with {max_training_frames} max frames per episode")
         print()
 
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+        training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
         MODEL_NAME = "tempo"
         MODEL_NAME += ".pth"
@@ -877,8 +804,6 @@ while True:
 
         torch.save(model1.state_dict(), MODEL_SAVE_PATH)
         print(f"save model : {MODEL_SAVE_PATH}")
-
-
         """
 
         print("Do you want to save the model : yes [1] | no [2] ")
@@ -916,12 +841,45 @@ while True:
         DEBUG(env1)
 
     elif QuestionAction == 4:
-        frames_per_batch = 131720
-        buffer_Collect_Size = 8192
+        print("Choose model name :")
+
+        MODEL_NAME = input()
+        MODEL_NAME += ".pth"
+        MODEL_LOAD_PATH = os.path.join(path, MODEL_NAME)
+
+        model1.load_state_dict(torch.load(MODEL_LOAD_PATH))
+        model1.eval()
+        print("Model loaded successfully!")
+
+
+        frames_per_batch = 10_000_000
+        buffer_Collect_Size = 2048
         num_epochs = 15
         sub_batch_size = 512
         max_training_frames = 8192
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+
+        chunk = 80
+        divide = frames_per_batch//chunk
+        print(divide)
+        print(chunk)
+
+        for i in range(divide):
+            training(divide, sub_batch_size, optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+            
+            MODEL_NAME = str(i)
+            MODEL_NAME += ".pth"
+            MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+
+            torch.save(model1.state_dict(), MODEL_SAVE_PATH)
+            print(f"save model : {MODEL_SAVE_PATH}")
+
+            MODEL_NAME = str(i)
+            MODEL_NAME += ".pth"
+            MODEL_LOAD_PATH = os.path.join(path, MODEL_NAME)
+
+            model1.load_state_dict(torch.load(MODEL_LOAD_PATH))
+            model1.eval()
+            print("Model loaded successfully!")
 
 
 p.disconnect()

@@ -41,6 +41,7 @@ class Env():
         self.penaltie = 2
         self.goalReward = 2
         self.checkpoint = 0
+        self.checkpointMultiplier = 1
 
         self.size = 10
         self.border = 7
@@ -159,8 +160,8 @@ class Env():
         self.goalPosition, _ = p.getBasePositionAndOrientation(self.goal)
         
 
-        distanceX = abs(self.goalPosition[0] - self.spiderPosition[0])
-        distanceY = abs(self.goalPosition[1] - self.spiderPosition[1])
+        distanceX = self.goalPosition[0] - self.spiderPosition[0]
+        distanceY = self.goalPosition[1] - self.spiderPosition[1]
         distance = math.sqrt(distanceX**2 + distanceY**2)
 
 
@@ -236,6 +237,7 @@ class Env():
         reward = 0
 
         firstDistanceGoal = self.reload_Distance
+        
 
         distance90Percent = firstDistanceGoal * (90/100)
         distance80Percent = firstDistanceGoal * (80/100)
@@ -273,11 +275,14 @@ class Env():
         #delta = min(delta, 3)
         #print(f"delta  : {delta}")
         #reward += delta
+        """
+        if delta < 0.1:
+            reward -= 0.5
+            print("bouge pas")
+        """
+        
 
         
-        distanceDone = firstDistanceGoal - distance
-        #print(delta)
-        reward += distanceDone
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -304,29 +309,36 @@ class Env():
             if distance < distance90Percent and self.checkpoint == 0:
                 self.checkpoint = 1
                 reward += self.goalReward
-                
+                self.checkpointMultiplier = 2
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 1")
 
             if distance < distance80Percent and self.checkpoint == 1:
                 self.checkpoint = 2
                 reward += self.goalReward * 1.5
-                
+                self.checkpointMultiplier = 2.5
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 2")
 
             if distance < distance65Percent and self.checkpoint == 2:
                 self.checkpoint = 3
                 reward += self.goalReward * 2
-
+                self.checkpointMultiplier = 3
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 3")
 
             if distance < distance50Percent and self.checkpoint == 3:
                 self.checkpoint = 4
                 reward += self.goalReward * 3
+                self.checkpointMultiplier = 3.5
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 4")
             
             if distance < distance35Percent and self.checkpoint == 4:
                 self.checkpoint = 5
                 reward += self.goalReward * 4
+                self.checkpointMultiplier = 4
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 5")
 
             # win
@@ -334,13 +346,21 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
+        distanceDone = firstDistanceGoal - distance
+        #print(delta)
+        if reward > 0:
+            distanceDone = distanceDone / 2
+
+        reward += distanceDone * self.checkpointMultiplier
+        #print(distanceDone)
+
         #print(f"reward : {reward}")
         return reward, done, won
 
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
-lr = 0.01
+lr = 0.001
 max_grad_norm = 1.0
 
 clip_epsilon = (0.3) # value of the PPO loss
@@ -523,10 +543,10 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, 
     #print(f"Over {max_training_frames} frames : reset")
 
 
-def training(frames_per_batch, sub_batch_size, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
+def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
     D_buffer = buffer()
     env.reload()
-    optimizer = optim.Adam(model1.parameters(), lr=lr)
+    optimizer = optimizerAdam
 
     graphRewardMean = []
 
@@ -788,8 +808,11 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
+
 model1 = ActorCritic(state_dim=38, action_dim=24)
+optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
+
 #env2 = Env()
 """
 frames_per_batch = 131720
@@ -823,7 +846,7 @@ while True:
     elif QuestionAction == 1:
 
         frames_per_batch = 131720
-        buffer_Collect_Size = 8192
+        buffer_Collect_Size = 4096
         num_epochs = 15
         sub_batch_size = 512
         max_training_frames = 8192
@@ -873,7 +896,7 @@ while True:
         print(f"training model with {max_training_frames} max frames per episode")
         print()
 
-        training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+        training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 
         MODEL_NAME = "tempo"
         MODEL_NAME += ".pth"
@@ -941,7 +964,7 @@ while True:
         print(chunk)
 
         for i in range(divide):
-            training(divide, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+            training(divide, sub_batch_size, optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
             
             MODEL_NAME = str(i)
             MODEL_NAME += ".pth"

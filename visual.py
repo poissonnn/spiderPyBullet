@@ -142,6 +142,15 @@ def third_Tensor_Graphic(reward,
    
 
     plt.savefig("training.png")
+    """
+    graphRewardMean        = []
+    specificGraphReward10  = [] 
+    specificGraphReward4   = [] 
+    specificGraphReward2   = [] 
+    specificGraphReward1_3 = []
+    specificGraphReward1_1 = []
+    XGraphRewardMean       = []
+    """
 
 
 a = []
