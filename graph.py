@@ -15,6 +15,7 @@ teal_dark   = [40 /255, 90 /255, 72 /255]
 teal_medium = [64 /255, 138/255, 113/255]
 teal_light  = [176/255, 228/255, 204/255]
 
+blue_dark   = [56 /255, 82 /255, 180/255]
 blue_light  = [100/255, 100/255, 220/255]
 
 purple      = [93 /255, 28 /255, 106/255]
@@ -130,9 +131,8 @@ def policy_loss(PolicyLoss,num_epochs):
 
     PolicyLossMean = np.mean(PolicyLoss)
 
-    ax.plot(PolicyLossBatchMean, color = pink, linewidth = 2, zorder = 1)
-    #ax.plot(,PolicyLossBatchMean, color = pink, zorder = 2)
-    ax.axhline(PolicyLossMean, color = purple, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
+    ax.plot(PolicyLossBatchMean, color = blue_light, linewidth = 2, zorder = 1)
+    ax.axhline(PolicyLossMean, color = blue_dark, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
 
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
 
@@ -161,8 +161,8 @@ def value_loss(ValueLoss,num_epochs):
 
     ValueLossMean = np.mean(ValueLoss)
 
-    ax.plot(ValueLossBatchMean, color = pink, linewidth = 2, zorder = 1)
-    ax.axhline(ValueLossMean, color = purple, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
+    ax.plot(ValueLossBatchMean, color = blue_light, linewidth = 2, zorder = 1)
+    ax.axhline(ValueLossMean, color = blue_dark, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
 
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
 

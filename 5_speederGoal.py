@@ -43,7 +43,7 @@ class Env():
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
         self.penaltie = 2
-        self.goalReward = 2
+        self.goalReward = 1
         self.checkpoint = 0
         self.checkpointMultiplier = 1
 
@@ -268,15 +268,7 @@ class Env():
 
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
 
-        delta = (OldDistance - distance)*100
-        #delta = min(delta, 3)
-        #print(f"delta  : {delta}")
-        #reward += delta
-        """
-        if delta < 0.1:
-            reward -= 0.5
-            print("bouge pas")
-        """
+
         
 
         if height >0.45:
@@ -307,6 +299,7 @@ class Env():
             if distance < distance90Percent and self.checkpoint == 0:
                 self.checkpoint = 1
                 reward += self.goalReward
+
                 self.checkpointMultiplier = 2
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 1")
@@ -314,28 +307,32 @@ class Env():
             if distance < distance80Percent and self.checkpoint == 1:
                 self.checkpoint = 2
                 reward += self.goalReward * 1.5
-                self.checkpointMultiplier = 2.5
+
+                self.checkpointMultiplier = 1.5
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 2")
 
             if distance < distance65Percent and self.checkpoint == 2:
                 self.checkpoint = 3
                 reward += self.goalReward * 2
-                self.checkpointMultiplier = 3
+
+                self.checkpointMultiplier = 1.75
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 3")
 
             if distance < distance50Percent and self.checkpoint == 3:
                 self.checkpoint = 4
                 reward += self.goalReward * 3
-                self.checkpointMultiplier = 3.5
+
+                self.checkpointMultiplier = 2
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 4")
             
             if distance < distance35Percent and self.checkpoint == 4:
                 self.checkpoint = 5
                 reward += self.goalReward * 4
-                self.checkpointMultiplier = 4
+
+                self.checkpointMultiplier = 2.5
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
                 print("checkpoint 5")
 
@@ -344,11 +341,17 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
+        delta = (OldDistance - distance)*100
+        delta = min(delta, 3)
+
+
+
         distanceDone = firstDistanceGoal - distance
         #print(delta)
 
         distanceDone = distanceDone / 2
 
+        reward += delta * self.checkpointMultiplier
         reward += distanceDone * self.checkpointMultiplier
         #print(distanceDone)
 
@@ -362,9 +365,9 @@ lr = 0.0001
 max_grad_norm = 1.0
 
 clip_epsilon = (0.2) # value of the PPO loss
-gamma = 0.999
+gamma = 0.99
 lmbda = 0.95
-entropy_eps = 0.01
+entropy_eps = 0.001
 
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim = 256):
@@ -625,7 +628,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         # learning loop
         if len(D_buffer.buffer) >= buffer_Collect_Size :
             print("ppo")
-            subdata = D_buffer.sample(sub_batch_size)
+            subdata = D_buffer.return_buffer()
 
             # calculate the amount of reward the model should get
             # use to compare the model thus to update the model
@@ -655,7 +658,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
                     value_loss = compute_value_loss(mini_batch, returns_batch, model1)
                     graphValueLoss.append(value_loss) # only for the graph
 
-                    loss = policy_loss + value_loss 
+                    loss = policy_loss + value_loss * 0.5
                     #print(loss)
                     
                     loss.backward()
@@ -803,14 +806,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-
+"""
 frames_per_batch = 8000
 buffer_Collect_Size = 2000
 num_epochs = 15
 sub_batch_size = 1000
 max_training_frames = 2000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-
+"""
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
@@ -835,7 +838,7 @@ while True:
 
         frames_per_batch = 1_000_000
         buffer_Collect_Size = 8192
-        num_epochs = 30
+        num_epochs = 10
         sub_batch_size = 2048
         max_training_frames = 8192
 
