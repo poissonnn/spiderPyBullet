@@ -1,25 +1,23 @@
-import pybullet as p
+import matplotlib.pyplot as plt
 import numpy as np
-import threading
+
+graphRewards = [0,1,1.5,5,8,9,10,6,5,4,-5,-18,-9,-52]
+
+cumulative = []
+total = 0
+
+for i in graphRewards:
+    total += i
+    cumulative.append(total)
 
 
-def simulate():
-    p.connect(p.DIRECT)
-    # Create a simulation
-    p.createMultiBody(1, p.createCollisionShape(p.GEOM_SPHERE, radius=0.5))
-    # Simulate for 100 steps
-    for i in range(100):
-        p.stepSimulation()
-    # Disconnect from the physics server
-    p.disconnect()
 
+fig, ax = plt.subplots()
 
-threads = []
-for i in range(10):
-    thread = threading.Thread(target=simulate)
-    threads.append(thread)
-    thread.start()
+ax.plot(cumulative, color='black')
+ax.axhline(0, color='black')
 
+ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) > 0, facecolor='green', alpha=.5, interpolate=True)
+ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) < 0, facecolor='red'  , alpha=.5, interpolate=True)
 
-for thread in threads:
-    thread.join()
+plt.show()

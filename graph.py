@@ -1,25 +1,33 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
-red_light   = [220/255, 100/255, 100/255]
 red_dark    = [97 /255, 0  /255, 6  /255]
-green_light = [100/255, 200/255, 100/255]
-green_dark  = [80 /255, 180/255, 80 /255]
-blue_light  = [100/255, 100/255, 220/255]
-purple      = [93 /255, 28 /255, 106/255]
-peach       = [255/255, 176/255, 144/255]
-orange      = [255/255, 127/255, 17 /255]
-yellow      = [252/255, 191/255, 73 /255]
+red_light   = [220/255, 100/255, 100/255]
 orange_dark = [214/255, 40 /255, 40 /255]
+orange      = [255/255, 127/255, 17 /255]
+peach       = [255/255, 176/255, 144/255]
+yellow      = [252/255, 191/255, 73 /255]
+
+green_dark  = [80 /255, 180/255, 80 /255]
+green_light = [100/255, 200/255, 100/255]
+
+teal_dark   = [40 /255, 90 /255, 72 /255]
+teal_medium = [64 /255, 138/255, 113/255]
+teal_light  = [176/255, 228/255, 204/255]
+
+blue_light  = [100/255, 100/255, 220/255]
+
+purple      = [93 /255, 28 /255, 106/255]
+pink        = [202/255, 89 /255, 149/255]
+
 black       = [50 /255, 51 /255, 57 /255]
 true_black  = [0.1,0.1,0.1]
 gray        = [150/255, 150/255, 150/255]
 white       = [1, 1, 1]
 
-teal_light  = [176/255, 228/255, 204/255]
-teal_medium = [64 /255, 138/255, 113/255]
-teal_dark   = [40 /255, 90 /255, 72 /255]
+size = (14,12)
+
+graphPath = r"Graph/"
 
 # Helper function used for visualization in the following examples
 def identify_axes(ax_dict, fontsize=48):
@@ -48,7 +56,7 @@ def cumulative_reward(graphRewards):
         total += i
         cumulative.append(total)
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=size)
     ax.set_title("Cumulative reward")
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
@@ -60,16 +68,14 @@ def cumulative_reward(graphRewards):
 
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
     
-
     plt.tight_layout()
-    plt.savefig("cumulative_reward.png")
+    plt.savefig("Graph/cumulative_reward.png")
     plt.close()
-
 
 def Reward(graphRewards):
     print("reward graph")
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=size)
     ax.set_title("Reward")
 
     ax.plot(graphRewards, color = orange_dark, zorder = 1)
@@ -81,35 +87,85 @@ def Reward(graphRewards):
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
 
     plt.tight_layout()
-    plt.savefig("Reward.png")
+    plt.savefig("Graph/Reward.png")
     plt.close()
-
-
-
-
-graphRewards = [1,2,6,5,8,7,40,80,90,80,-70,-10,-10,12,55,-154,-785]
-Reward(graphRewards)
-cumulative_reward(graphRewards)
 
 def episode_length(episodeLength):
     print("episode length graph")
 
-    fig, ax = plt.subplots(figsize=(12, 5))
+    fig, ax = plt.subplots(figsize=size)
     ax.set_title("Episode length")
 
+    episodeLengthMean = np.mean(episodeLength)
 
-    ax.plot(episodeLength, color = purple, zorder = 1)
-    ax.axhline(0, color = purple, linestyle = (0,(2,2.5)), linewidth = 1.5, zorder = 2)
+    ax.plot(episodeLength, color = peach, zorder = 1)
+    #ax.axhline(episodeLengthMean, color = pink, linestyle = (0,(5,1)), linewidth = 1, zorder = 2)
+    ax.axhline(episodeLengthMean, color = purple, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
+
 
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
 
     plt.tight_layout()
-    plt.savefig("episodeLength.png")
+    plt.savefig("Graph/episodeLength.png")
     plt.close()
 
-
-def policy_loss():
+def policy_loss(PolicyLoss,num_epochs):
     print("policy loss graph")
 
-def value_loss():
+    PolicyLoss = PolicyLoss.tolist()
+
+    batch = len(PolicyLoss)//num_epochs
+
+    PolicyLossBatchMean = []
+    PolicyLossCopy = PolicyLoss.copy()
+
+    for i in range(batch):
+
+        PolicyLossBatchMean.append(np.mean(PolicyLossCopy[:num_epochs]))
+        del PolicyLossCopy[0:num_epochs]
+
+
+    fig, ax = plt.subplots(figsize=size)
+    ax.set_title("Policy loss")
+
+    PolicyLossMean = np.mean(PolicyLoss)
+
+    ax.plot(PolicyLossBatchMean, color = pink, linewidth = 2, zorder = 1)
+    #ax.plot(,PolicyLossBatchMean, color = pink, zorder = 2)
+    ax.axhline(PolicyLossMean, color = purple, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
+
+    ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
+
+    plt.tight_layout()
+    plt.savefig("Graph/policyLoss.png")
+    plt.close()
+    
+def value_loss(ValueLoss,num_epochs):
     print("value loss graph")
+
+    ValueLoss = ValueLoss.tolist()
+
+    batch = len(ValueLoss)//num_epochs
+
+    ValueLossBatchMean = []
+    ValueLossCopy = ValueLoss.copy()
+
+    for i in range(batch):
+
+        ValueLossBatchMean.append(np.mean(ValueLossCopy[:num_epochs]))
+        del ValueLossCopy[0:num_epochs]
+
+
+    fig, ax = plt.subplots(figsize=size)
+    ax.set_title("Policy loss")
+
+    ValueLossMean = np.mean(ValueLoss)
+
+    ax.plot(ValueLossBatchMean, color = pink, linewidth = 2, zorder = 1)
+    ax.axhline(ValueLossMean, color = purple, linestyle = (0,(5,1)), linewidth = 2, zorder = 3)
+
+    ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
+
+    plt.tight_layout()
+    plt.savefig("Graph/ValueLoss.png")
+    plt.close()

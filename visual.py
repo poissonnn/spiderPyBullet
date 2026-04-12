@@ -50,25 +50,7 @@ def tensorGraphic(reward, episodeLength):
 
     plt.savefig("training.png")
 
-"""
-def third_Tensor_Graphic(reward, episodeLength, rewardSpe):
-    print("graph")
 
-    fig, axs = plt.subplots(2,2,figsize=(Size))
-
-    axs[0][0].set_title("Reward")
-    axs[0][0].plot(reward, color = green_light)
-
-    axs[0][1].set_title("Reward on 1/4 step")
-    axs[0][1].plot(rewardSpe, color = orange)
-    
-    axs[1][1].set_title("EpisodeLength")
-    axs[1][1].plot(episodeLength, color = red_light)
-
-
-
-    plt.savefig("training.png")
-"""
 graphRewardMean        = []
 specificGraphReward10  = [] 
 specificGraphReward4   = [] 
@@ -142,16 +124,14 @@ def third_Tensor_Graphic(reward,
    
 
     plt.savefig("training.png")
-    """
-    graphRewardMean        = []
-    specificGraphReward10  = [] 
-    specificGraphReward4   = [] 
-    specificGraphReward2   = [] 
-    specificGraphReward1_3 = []
-    specificGraphReward1_1 = []
-    XGraphRewardMean       = []
-    """
 
+
+def cumulative_reward(rewards):
+    cumulative = []
+    total = 0
+    for r in rewards:
+        total += r
+        cumulative.append(total)
 
 a = []
 x = []

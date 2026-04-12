@@ -20,14 +20,18 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 import visual
+import graph
 
 def radian(x):
     return 180 * x / np.pi
 
 path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
-
+graphPath = r"/home/fish/FISH/prod/code/python/PyBullet/Graph"
 if not os.path.exists(path):
     os.makedirs(path)
+
+if not os.path.exists(graphPath):
+    os.makedirs(graphPath)
 
 # --- PYBULLET ---
 
@@ -260,16 +264,9 @@ class Env():
 
         # --- delta calculation ---
         # variable for the deplacement detection
-        distanceX = nextState[6]
-        distanceY = nextState[7]
+        distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
 
-        distance = math.sqrt(distanceX**2 + distanceY**2)
-
-        OldDistanceX = oldState[6]
-        OldDistanceY = oldState[7]
-
-        OldDistance = math.sqrt(OldDistanceX**2 + OldDistanceY**2)
-
+        OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
 
         delta = (OldDistance - distance)*100
         #delta = min(delta, 3)
@@ -282,7 +279,8 @@ class Env():
         """
         
 
-        
+        if height >0.45:
+            reward += 0.05
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -348,8 +346,8 @@ class Env():
 
         distanceDone = firstDistanceGoal - distance
         #print(delta)
-        if reward > 0:
-            distanceDone = distanceDone / 2
+
+        distanceDone = distanceDone / 2
 
         reward += distanceDone * self.checkpointMultiplier
         #print(distanceDone)
@@ -360,10 +358,10 @@ class Env():
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
-lr = 0.001
+lr = 0.0001
 max_grad_norm = 1.0
 
-clip_epsilon = (0.3) # value of the PPO loss
+clip_epsilon = (0.2) # value of the PPO loss
 gamma = 0.999
 lmbda = 0.95
 entropy_eps = 0.01
@@ -528,18 +526,13 @@ def PPO_loss(subdata, advantages, model1):
     return policy_loss
 
 # reset() is link to the ppo | env.reload() is the reset for the agent/environnement
-def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards, graphRewards):
+def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards):
     episodeLength.append(episode_count_frames)
     episode_count_frames = 0
-    episodes_rewards.append(current_rewards)
-    current_rewards = []
+
     env.reload()
-    """
-    visual.third_Tensor_Graphic(graphRewards,
-                                episodeLength,
-                                episodes_rewards)
-    """
-    return episode_count_frames, current_rewards, episodes_rewards
+
+    return episode_count_frames, 
     #print(f"Over {max_training_frames} frames : reset")
 
 
@@ -548,13 +541,10 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     env.reload()
     optimizer = optimizerAdam
 
-    graphRewardMean = []
-
-    episodes_rewards = []
-    current_rewards = []
     graphRewards = []
-    
     episodeLength = []
+    graphValueLoss = []
+    graphPolicyLoss = []
 
     Won = 0
 
@@ -573,10 +563,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         # limit episode length
         if episode_count_frames >= max_training_frames:
             D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                            episode_count_frames,
-                                                                            D_buffer, env, episodes_rewards,
-                                                                            current_rewards, graphRewards)
+            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
 
         # take info
         Data = env.observe()          # data = state = s
@@ -620,24 +607,18 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         reward, done, won = env.compute_reward(next_state,Data)     # reward = r
         
-        current_rewards.append(reward)
         graphRewards.append(reward)
         
 
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
             #D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                episode_count_frames,
-                                                                D_buffer, env, episodes_rewards,
-                                                                current_rewards, graphRewards)
+            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
 
         elif won:
             #D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                            episode_count_frames,
-                                                                            D_buffer, env, episodes_rewards,
-                                                                            current_rewards, graphRewards)
+            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
+
             Won += 1
             print(" - - DONE - - ")
 
@@ -668,9 +649,11 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
                     # calculate the loss of the policy for the actor
                     policy_loss =  PPO_loss(mini_batch, advantages_batch, model1)
+                    graphPolicyLoss.append(policy_loss) # only for the graph
 
                     # calculate the loss of the policy for the critic
                     value_loss = compute_value_loss(mini_batch, returns_batch, model1)
+                    graphValueLoss.append(value_loss) # only for the graph
 
                     loss = policy_loss + value_loss 
                     #print(loss)
@@ -694,18 +677,24 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         #p.stepSimulation()
         #time.sleep(1./240.)
     print(f"Number of Finish Episode : {Won}")
-    #print(episodeLength)
-    
-    visual.third_Tensor_Graphic(graphRewards,
-                                episodeLength,
-                                episodes_rewards)
-    graphRewardMean = []
 
-    episodes_rewards = []
-    current_rewards = []
+    graph.cumulative_reward(graphRewards)
+    graph.Reward(graphRewards)
+
+    graph.episode_length(episodeLength)
+
+    numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().numpy()
+    graph.policy_loss(numpyGraphPolicyLoss, num_epochs)
+
+    numpyGraphValueLoss = torch.stack(graphValueLoss).cpu().detach().numpy()
+    graph.value_loss(numpyGraphValueLoss, num_epochs)
+
+    # reset all variable for the next training
+
     graphRewards = []
-    
     episodeLength = []
+    graphValueLoss = []
+    graphPolicyLoss = []
 
     Won = 0
 
@@ -814,15 +803,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-"""
-frames_per_batch = 131720
-buffer_Collect_Size = 8192
+
+frames_per_batch = 8000
+buffer_Collect_Size = 2000
 num_epochs = 15
-sub_batch_size = 512
-max_training_frames = 8192
-training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-training(frames_per_batch, sub_batch_size, model1, max_training_frames, env2, buffer_Collect_Size, num_epochs)
-"""
+sub_batch_size = 1000
+max_training_frames = 2000
+training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
+
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
@@ -845,10 +833,10 @@ while True:
     # train
     elif QuestionAction == 1:
 
-        frames_per_batch = 131720
-        buffer_Collect_Size = 4096
-        num_epochs = 15
-        sub_batch_size = 512
+        frames_per_batch = 1_000_000
+        buffer_Collect_Size = 8192
+        num_epochs = 30
+        sub_batch_size = 2048
         max_training_frames = 8192
 
         print("\nGo for training")
