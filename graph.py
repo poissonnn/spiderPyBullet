@@ -79,6 +79,8 @@ def Reward(graphRewards):
     fig, ax = plt.subplots(figsize=size)
     ax.set_title("Reward")
 
+    graphRewards = [round(num, 3) for num in graphRewards]
+
     ax.plot(graphRewards, color = orange_dark, zorder = 1)
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
@@ -168,4 +170,22 @@ def value_loss(ValueLoss,num_epochs):
 
     plt.tight_layout()
     plt.savefig("Graph/ValueLoss.png")
+    plt.close()
+
+def episodeReward(episodeReward,num_epochs):
+    print("episodeReward graph")
+
+    fig, ax = plt.subplots(figsize=size)
+    ax.set_title("Episode Reward")
+
+    ax.plot(episodeReward, color = orange_dark, zorder = 1)
+
+    ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
+    ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where= np.array(episodeReward) > 0, color = yellow, alpha = 0.25, interpolate = True)
+    ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where= np.array(episodeReward) < 0, color = orange_dark  , alpha = 0.25, interpolate = True)
+
+    ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
+
+    plt.tight_layout()
+    plt.savefig("Graph/episodeReward.png")
     plt.close()

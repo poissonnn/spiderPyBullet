@@ -268,9 +268,6 @@ class Env():
 
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
 
-
-        
-
         if height >0.45:
             reward += 0.05
         
@@ -341,7 +338,7 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
-        delta = (OldDistance - distance)*100
+        delta = (OldDistance - distance)*50
         delta = min(delta, 3)
 
 
@@ -361,6 +358,8 @@ class Env():
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
+lr_actor  = 0.0003 # not implemented
+lr_critic = 0.0001 # not implemented
 lr = 0.0001
 max_grad_norm = 1.0
 
@@ -529,13 +528,16 @@ def PPO_loss(subdata, advantages, model1):
     return policy_loss
 
 # reset() is link to the ppo | env.reload() is the reset for the agent/environnement
-def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards):
+def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, episodeReward, graphEpisodeReward):
     episodeLength.append(episode_count_frames)
     episode_count_frames = 0
 
+    graphEpisodeReward.append(episodeReward)
+    episodeReward = 0
+
     env.reload()
 
-    return episode_count_frames, 
+    return episode_count_frames,episodeReward,graphEpisodeReward
     #print(f"Over {max_training_frames} frames : reset")
 
 
@@ -548,6 +550,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     episodeLength = []
     graphValueLoss = []
     graphPolicyLoss = []
+    graphEpisodeReward = []
+    episodeReward = 0
 
     Won = 0
 
@@ -566,7 +570,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         # limit episode length
         if episode_count_frames >= max_training_frames:
             D_buffer.clear_buffer()
-            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
+            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
 
         # take info
         Data = env.observe()          # data = state = s
@@ -609,18 +613,21 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         next_state = env.observe()      # next_state = s'
 
         reward, done, won = env.compute_reward(next_state,Data)     # reward = r
-        
-        graphRewards.append(reward)
-        
 
+        graphRewards.append(reward)
+        episodeReward += reward
+        print(f"episode reward : {reward}")
+        print(f"reward : {episodeReward}")
+        print(f"episode reward : {graphEpisodeReward}")
+        
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
             #D_buffer.clear_buffer()
-            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
+            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
 
         elif won:
             #D_buffer.clear_buffer()
-            episode_count_frames, = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards)
+            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
 
             Won += 1
             print(" - - DONE - - ")
@@ -692,12 +699,15 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     numpyGraphValueLoss = torch.stack(graphValueLoss).cpu().detach().numpy()
     graph.value_loss(numpyGraphValueLoss, num_epochs)
 
+    graph.episodeReward(graphEpisodeReward, num_epochs)
+
     # reset all variable for the next training
 
     graphRewards = []
     episodeLength = []
     graphValueLoss = []
     graphPolicyLoss = []
+    graphEpisodeReward = []
 
     Won = 0
 
@@ -806,14 +816,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-"""
+
 frames_per_batch = 8000
 buffer_Collect_Size = 2000
 num_epochs = 15
 sub_batch_size = 1000
 max_training_frames = 2000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-"""
+
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
