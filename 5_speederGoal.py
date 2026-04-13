@@ -48,7 +48,7 @@ class Env():
         self.checkpointMultiplier = 1
 
         self.size = 10
-        self.border = 7
+        self.border = 8
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
         self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
@@ -338,7 +338,7 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
-        delta = (OldDistance - distance)*50
+        delta = (OldDistance - distance)*10
         delta = min(delta, 3)
 
 
@@ -531,7 +531,6 @@ def PPO_loss(subdata, advantages, model1):
 def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, episodeReward, graphEpisodeReward):
     episodeLength.append(episode_count_frames)
     episode_count_frames = 0
-
     graphEpisodeReward.append(episodeReward)
     episodeReward = 0
 
@@ -558,7 +557,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     total_count_frame = 0
     episode_count_frames = 0
 
-    for i in range (frames_per_batch):   
+    for i in range (frames_per_batch+1):   
         keys = p.getKeyboardEvents()
         if ord('c') in keys:
             print('save')
@@ -571,7 +570,6 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         if episode_count_frames >= max_training_frames:
             D_buffer.clear_buffer()
             episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
-
         # take info
         Data = env.observe()          # data = state = s
 
@@ -616,9 +614,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         graphRewards.append(reward)
         episodeReward += reward
-        print(f"episode reward : {reward}")
-        print(f"reward : {episodeReward}")
-        print(f"episode reward : {graphEpisodeReward}")
+
         
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
@@ -631,6 +627,10 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
             Won += 1
             print(" - - DONE - - ")
+
+        #print(f"reward : {reward}")
+        #print(f"episode reward : {episodeReward}")
+        #print(f"episode reward : {graphEpisodeReward}")
 
         # learning loop
         if len(D_buffer.buffer) >= buffer_Collect_Size :
@@ -816,14 +816,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-
-frames_per_batch = 8000
-buffer_Collect_Size = 2000
-num_epochs = 15
-sub_batch_size = 1000
-max_training_frames = 2000
+"""
+frames_per_batch = 4000
+buffer_Collect_Size = 1000
+num_epochs = 10
+sub_batch_size = 500
+max_training_frames = 1000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-
+"""
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")

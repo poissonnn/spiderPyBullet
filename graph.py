@@ -159,7 +159,7 @@ def value_loss(ValueLoss,num_epochs):
 
 
     fig, ax = plt.subplots(figsize=size)
-    ax.set_title("Policy loss")
+    ax.set_title("Value loss")
 
     ValueLossMean = np.mean(ValueLoss)
 
