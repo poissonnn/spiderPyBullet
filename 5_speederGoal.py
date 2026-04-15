@@ -24,7 +24,10 @@ import graph
 
 def radian(x):
     return 180 * x / np.pi
-
+"""
+saveFile = open("save.txt")    
+saveFile.close()
+"""
 path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
 graphPath = r"/home/fish/FISH/prod/code/python/PyBullet/Graph"
 if not os.path.exists(path):
@@ -688,18 +691,38 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         #time.sleep(1./240.)
     print(f"Number of Finish Episode : {Won}")
 
+    graphRewards         = [round(num, 3) for num in graphRewards]
+    episodeLength        = [round(num, 3) for num in episodeLength]
+
+    numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().tolist()
+    numpyGraphPolicyLoss = [round(num, 3) for num in numpyGraphPolicyLoss]
+
+    numpyGraphValueLoss  = torch.stack(graphValueLoss).cpu().detach().tolist()
+    numpyGraphValueLoss  = [round(num, 3) for num in numpyGraphValueLoss]
+
     graph.cumulative_reward(graphRewards)
     graph.Reward(graphRewards)
 
     graph.episode_length(episodeLength)
 
-    numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().numpy()
     graph.policy_loss(numpyGraphPolicyLoss, num_epochs)
 
-    numpyGraphValueLoss = torch.stack(graphValueLoss).cpu().detach().numpy()
     graph.value_loss(numpyGraphValueLoss, num_epochs)
 
     graph.episodeReward(graphEpisodeReward, num_epochs)
+
+    with open("save.txt", "a") as saveFile:
+
+        saveFile.write("----\n")
+        
+        saveFile.write(f"graphRewards = ({graphRewards}).\n")
+        saveFile.write(f"episodeLength = ({episodeLength}).\n")
+        saveFile.write(f"numpyGraphPolicyLoss = ({numpyGraphPolicyLoss}).\n")
+        saveFile.write(f"numpyGraphValueLoss = ({numpyGraphValueLoss}).\n")
+        saveFile.write(f"num_epochs = ({num_epochs}).\n")
+
+    #saveFile.close()
+    
 
     # reset all variable for the next training
 
@@ -816,14 +839,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-"""
+
 frames_per_batch = 4000
 buffer_Collect_Size = 1000
 num_epochs = 10
 sub_batch_size = 500
 max_training_frames = 1000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-"""
+
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")

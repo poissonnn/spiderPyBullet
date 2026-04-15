@@ -79,8 +79,6 @@ def Reward(graphRewards):
     fig, ax = plt.subplots(figsize=size)
     ax.set_title("Reward")
 
-    graphRewards = [round(num, 3) for num in graphRewards]
-
     ax.plot(graphRewards, color = orange_dark, zorder = 1)
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
@@ -115,7 +113,7 @@ def episode_length(episodeLength):
 def policy_loss(PolicyLoss,num_epochs):
     print("policy loss graph")
 
-    PolicyLoss = PolicyLoss.tolist()
+    #PolicyLoss = PolicyLoss.tolist()
 
     batch = len(PolicyLoss)//num_epochs
 
@@ -145,7 +143,7 @@ def policy_loss(PolicyLoss,num_epochs):
 def value_loss(ValueLoss,num_epochs):
     print("value loss graph")
 
-    ValueLoss = ValueLoss.tolist()
+    #ValueLoss = ValueLoss.tolist()
 
     batch = len(ValueLoss)//num_epochs
 
