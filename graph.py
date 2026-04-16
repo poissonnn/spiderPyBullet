@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
 
 red_dark    = [97 /255, 0  /255, 6  /255]
 red_light   = [220/255, 100/255, 100/255]
@@ -120,8 +121,11 @@ def policy_loss(PolicyLoss,num_epochs):
     PolicyLossBatchMean = []
     PolicyLossCopy = PolicyLoss.copy()
 
-    for i in range(batch):
+    batch = int(batch)
+    num_epochs =  int(num_epochs)
 
+    for i in range(batch):
+        
         PolicyLossBatchMean.append(np.mean(PolicyLossCopy[:num_epochs]))
         del PolicyLossCopy[0:num_epochs]
 
@@ -149,6 +153,9 @@ def value_loss(ValueLoss,num_epochs):
 
     ValueLossBatchMean = []
     ValueLossCopy = ValueLoss.copy()
+
+    batch = int(batch)
+    num_epochs =  int(num_epochs)
 
     for i in range(batch):
 
@@ -187,3 +194,38 @@ def episodeReward(episodeReward,num_epochs):
     plt.tight_layout()
     plt.savefig("Graph/episodeReward.png")
     plt.close()
+
+linesCount = 0
+
+with open("save.txt") as SaveFile:
+    
+    lines = SaveFile.readlines()
+
+counter = len(lines)
+#print(counter)
+
+# -- read all the data from the save file --
+
+graphRewards         = lines[-6].strip()
+graphRewards = [float(i) for i in graphRewards[1:-1].split(", ")] # Le .split(", ") supprime ce qui est inutile
+
+episodeLength        = lines[-5].strip()
+episodeLength = [float(i) for i in episodeLength[1:-1].split(", ")] 
+
+numpyGraphPolicyLoss = lines[-4].strip()
+numpyGraphPolicyLoss = [float(i) for i in numpyGraphPolicyLoss[1:-1].split(", ")] 
+
+numpyGraphValueLoss  = lines[-3].strip()
+numpyGraphValueLoss = [float(i) for i in numpyGraphValueLoss[1:-1].split(", ")] 
+
+graphEpisodeReward  = lines[-2].strip()
+graphEpisodeReward = [float(i) for i in graphEpisodeReward[1:-1].split(", ")] 
+
+num_epochs           = float(lines[-1].strip())
+
+cumulative_reward(graphRewards)
+Reward(graphRewards)
+episode_length(episodeLength)
+policy_loss(numpyGraphPolicyLoss, num_epochs)
+value_loss(numpyGraphValueLoss, num_epochs)
+episodeReward(graphEpisodeReward, num_epochs)

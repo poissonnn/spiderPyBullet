@@ -20,7 +20,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 import visual
-import graph
 
 def radian(x):
     return 180 * x / np.pi
@@ -700,29 +699,28 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     numpyGraphValueLoss  = torch.stack(graphValueLoss).cpu().detach().tolist()
     numpyGraphValueLoss  = [round(num, 3) for num in numpyGraphValueLoss]
 
-    graph.cumulative_reward(graphRewards)
-    graph.Reward(graphRewards)
 
-    graph.episode_length(episodeLength)
-
-    graph.policy_loss(numpyGraphPolicyLoss, num_epochs)
-
-    graph.value_loss(numpyGraphValueLoss, num_epochs)
-
-    graph.episodeReward(graphEpisodeReward, num_epochs)
 
     with open("save.txt", "a") as saveFile:
 
         saveFile.write("----\n")
-        
+        """
         saveFile.write(f"graphRewards = ({graphRewards}).\n")
         saveFile.write(f"episodeLength = ({episodeLength}).\n")
         saveFile.write(f"numpyGraphPolicyLoss = ({numpyGraphPolicyLoss}).\n")
         saveFile.write(f"numpyGraphValueLoss = ({numpyGraphValueLoss}).\n")
-        saveFile.write(f"num_epochs = ({num_epochs}).\n")
+        saveFile.write(f"num_epochs = ({num_epochs}).\n")"""
+
+        saveFile.write(f"{graphRewards}\n")
+        saveFile.write(f"{episodeLength}\n")
+        saveFile.write(f"{numpyGraphPolicyLoss}\n")
+        saveFile.write(f"{numpyGraphValueLoss}\n")
+        saveFile.write(f"{graphEpisodeReward}\n")
+        saveFile.write(f"{num_epochs}\n")
 
     #saveFile.close()
     
+    import graph
 
     # reset all variable for the next training
 
