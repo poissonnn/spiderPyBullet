@@ -80,6 +80,12 @@ numpyGraphPolicyLossIndices = -4
 numpyGraphValueLossIndices  = -5
 graphEpisodeRewardIndices   = -6
 
+
+allNum_epochs = []
+allGraphEpisodeReward = []
+allNumpyGraphValueLoss = []
+allNumpyGraphPolicyLoss = []
+allEpisodeLength = []
 allGraphRewards = []
 
 batch = counter//6
@@ -90,25 +96,28 @@ print()
 
 for i in range(batch):
     num_epochs = float(lines[num_epochsIndicies-batchSize*i].strip())
+    allNum_epochs.append(num_epochs)
 
     graphEpisodeReward = lines[graphRewardsIndices-batchSize*i].strip() 
     graphEpisodeReward = [float(i) for i in graphEpisodeReward[1:-1].split(", ")] 
+    allGraphEpisodeReward.append(graphEpisodeReward)    
 
 
     numpyGraphValueLoss = lines[episodeLengthIndices-batchSize*i].strip()
     numpyGraphValueLoss = [float(i) for i in numpyGraphValueLoss[1:-1].split(", ")] 
+    allNumpyGraphValueLoss.append(numpyGraphValueLoss)    
 
     numpyGraphPolicyLoss = lines[numpyGraphPolicyLossIndices-batchSize*i].strip()
     numpyGraphPolicyLoss = [float(i) for i in numpyGraphPolicyLoss[1:-1].split(", ")]
+    allNumpyGraphPolicyLoss.append(numpyGraphPolicyLoss)
 
     episodeLength = lines[numpyGraphValueLossIndices-batchSize*i].strip()
     episodeLength = [float(i) for i in episodeLength[1:-1].split(", ")] 
+    allEpisodeLength.append(episodeLength)
 
     graphRewards = lines[graphEpisodeRewardIndices-batchSize*i].strip()
     graphRewards = [float(i) for i in graphRewards[1:-1].split(", ")] # .split(", ") supp the useless part
-
     allGraphRewards.append(graphRewards)
-    print("a")
 
 
 Reward(allGraphRewards)
