@@ -220,7 +220,7 @@ def episodeReward(allEpisodeReward,num_epochs):
 
     alpha = 1
     zorder = 20
-    linewidth = 3.5
+    linewidth = 2.5
 
     fig, ax = plt.subplots(figsize=size)
     ax.set_title("Episode Reward")
@@ -230,11 +230,11 @@ def episodeReward(allEpisodeReward,num_epochs):
         cumulative = []
         
         ax.plot(episodeReward, color = orange_dark, zorder = zorder, alpha = alpha,linewidth = linewidth)
-        #ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where = np.array(episodeReward) > 0, color = yellow, alpha = alpha/4, interpolate = True, zorder = zorder-3)
-        #ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where = np.array(episodeReward) < 0, color = orange_dark  , alpha = alpha/4, interpolate = True ,zorder = zorder-3)
+        ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where = np.array(episodeReward) > 0, color = yellow, alpha = alpha/4, interpolate = True, zorder = zorder-3)
+        ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where = np.array(episodeReward) < 0, color = orange_dark  , alpha = alpha/4, interpolate = True ,zorder = zorder-3)
 
-        alpha -= 0.20 
-        linewidth -= 0.5
+        alpha -= 0.30 
+        linewidth -= 1.5
         zorder += 1
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
@@ -300,7 +300,7 @@ for i in range(batch):
 
 
 cumulative_reward(allGraphRewards)
-#Reward(allGraphRewards)
+Reward(allGraphRewards)
 episode_length(allEpisodeLength)
 
 policy_loss(numpyGraphPolicyLoss, num_epochs)

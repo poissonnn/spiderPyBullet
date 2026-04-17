@@ -269,9 +269,10 @@ class Env():
         distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
 
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
-
+        """
         if height >0.45:
             reward += 0.05
+        """
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -340,12 +341,12 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
+
+        """
         delta = (OldDistance - distance)*10
         delta = min(delta, 3)
 
-
-
-        distanceDone = firstDistanceGoal - distance
+        
         #print(delta)
 
         distanceDone = distanceDone / 2
@@ -353,8 +354,12 @@ class Env():
         reward += delta * self.checkpointMultiplier
         reward += distanceDone * self.checkpointMultiplier
         #print(distanceDone)
+        """
+        
+        distanceDone = firstDistanceGoal - distance
+        reward += distanceDone * self.checkpointMultiplier
 
-        #print(f"reward : {reward}")
+        print(f"reward : {reward}")
         return reward, done, won
 
 # --- PPO ---
@@ -837,14 +842,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-
+"""
 frames_per_batch = 4000
 buffer_Collect_Size = 1000
 num_epochs = 10
 sub_batch_size = 500
 max_training_frames = 1000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-
+"""
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
@@ -869,7 +874,7 @@ while True:
 
         frames_per_batch = 1_000_000
         buffer_Collect_Size = 8192
-        num_epochs = 10
+        num_epochs = 8
         sub_batch_size = 2048
         max_training_frames = 8192
 
