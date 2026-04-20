@@ -9,7 +9,7 @@ orange      = [255/255, 127/255, 17 /255]
 peach       = [255/255, 176/255, 144/255]
 yellow      = [252/255, 191/255, 73 /255]
 
-green_dark  = [80 /255, 180/255, 80 /255]
+green_dark  = [91 /255, 126/255, 60 /255]
 green_light = [100/255, 200/255, 100/255]
 
 teal_dark   = [40 /255, 90 /255, 72 /255]
@@ -49,33 +49,47 @@ def identify_axes(ax_dict, fontsize=48):
     for k, ax in ax_dict.items():
         ax.text(0.5, 0.5, k, transform=ax.transAxes, **kw)
 
-def cumulative_reward(graphRewards):
+def color_add(color,i,strength):
+    new_color = color.copy()
+    for j in range(0,3):
+        new_color[j] += i * strength *new_color[j]
+        new_color[j] = min(1,new_color[j])
+    return new_color
+
+def cumulative_reward(allGraphRewards):
     print("cumulative reward graph")
 
 
     alpha = 1
     zorder = 20
     linewidth = 3.0
+    i = 0
 
     fig, ax = plt.subplots(figsize=size)
     ax.set_title("Cumulative reward")
 
+
+
     for graphRewards in allGraphRewards:
+
         total = 0
         cumulative = []
-        
-        for i in graphRewards:
-            total += i
-            cumulative.append(total)
 
-        ax.plot(cumulative, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
+        for episodeRewards in graphRewards:
+            for j in episodeRewards:
+                if j !=0:
+                    total += j
+                    cumulative.append(total)
 
-        ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) > 0, color = green_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
-        ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) < 0, color = orange_dark  , alpha = alpha/4, interpolate = True, zorder = zorder-3)
-       
-        alpha -= 0.10 
-        linewidth -= 0.5
-        zorder += 1
+        ax.plot(cumulative, color = color_add(green_dark,i, 0.50), zorder = zorder, alpha = alpha,linewidth = linewidth)
+        i += 1
+
+        #ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) > 0, color = green_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
+        #ax.fill_between(range(len(cumulative)), np.array(cumulative), where= np.array(cumulative) < 0, color = orange_dark  , alpha = alpha/4, interpolate = True, zorder = zorder-3)
+
+        #alpha -= 0.10 
+        linewidth -= 0.0
+        zorder -= 1
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5)
     
@@ -86,8 +100,8 @@ def cumulative_reward(graphRewards):
     plt.close()
 
 def Reward(allGraphRewards):
-    print("reward graph")
-    
+    plt.close()
+
     alpha = 1
     zorder = 20
     linewidth = 3.5
@@ -95,18 +109,26 @@ def Reward(allGraphRewards):
     fig, ax = plt.subplots(figsize=size)
     ax.set_title("Reward")
 
+    allRewardsMean = []
+    allRewardsMax  = []
+    allRewardsMin  = []
+
     for graphRewards in allGraphRewards:
+        for rewards in graphRewards:
+
+            rewardsMax = max([rewards])
+            allRewardsMax.append(rewardsMax)
+
+            rewardsMin = min(rewards)
+            allRewardsMin.append(rewardsMin)
+
+            rewardsMean = sum(rewards)/len(rewards)
+            allRewardsMean.append(rewardsMean)
         
+    ax.plot(range(len(allRewardsMean)), allRewardsMean, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
+    # x values, y lower values, y upper values
+    ax.fill_between(range(len(allRewardsMean)), allRewardsMin, allRewardsMax, color = blue_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
 
-
-        ax.plot(graphRewards, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
-
-        alpha -= 0.20 
-        linewidth -= 0.5
-        zorder += 1
-
-        #ax.fill_between(range(len(graphRewards)), np.array(graphRewards), where= np.array(graphRewards) > 0, color = yellow, alpha = alpha/4, interpolate = True,zorder = zorder-3)
-        #ax.fill_between(range(len(graphRewards)), np.array(graphRewards), where= np.array(graphRewards) < 0, color = orange_dark  , alpha = alpha/4, interpolate = True, zorder = zorder-3)
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5, alpha = alpha)
     ax.grid(which = "major", alpha = 0.25, linestyle = "--", linewidth = 0.8,color = gray, zorder = 0)
@@ -138,7 +160,7 @@ def episode_length(allEpisodeLength):
 
         alpha -= 0.20 
         linewidth -= 0.8
-        zorder += 1
+        zorder -= 1
 
     #ax.plot(episodeLength, color = peach, zorder = 1)
     #ax.axhline(episodeLengthMean, color = pink, linestyle = (0,(5,1)), linewidth = 1, zorder = 2)
@@ -258,57 +280,65 @@ counter = len(lines)
 #print(counter)
 
 # -- read all the data from the save file --
-num_epochsIndicies          = -1
-graphRewardsIndices         = -2
-episodeLengthIndices        = -3
+
+episodeLengthIndices        = -5
 numpyGraphPolicyLossIndices = -4
-numpyGraphValueLossIndices  = -5
-graphEpisodeRewardIndices   = -6
+numpyGraphValueLossIndices  = -3
+graphEpisodeRewardsIndices  = -2
+num_epochsIndicies          = -1
 
-
-allNum_epochs = []
-allGraphEpisodeReward = []
-allNumpyGraphValueLoss = []
-allNumpyGraphPolicyLoss = []
 allEpisodeLength = []
-allGraphRewards = []
+allNumpyGraphPolicyLoss = []
+allNumpyGraphValueLoss = []
+allGraphEpisodeReward = []
+allNum_epochs = []
 
 batch = counter//6
 
 batchSize = counter//batch
 
 for i in range(batch):
-    num_epochs = float(lines[num_epochsIndicies-batchSize*i].strip())
-    allNum_epochs.append(num_epochs)
+    print(i)
 
-    graphEpisodeReward = lines[graphRewardsIndices-batchSize*i].strip() 
-    graphEpisodeReward = [float(i) for i in graphEpisodeReward[1:-1].split(", ")] 
-    allGraphEpisodeReward.append(graphEpisodeReward)    
-
-
-    numpyGraphValueLoss = lines[episodeLengthIndices-batchSize*i].strip()
-    numpyGraphValueLoss = [float(i) for i in numpyGraphValueLoss[1:-1].split(", ")] 
-    allNumpyGraphValueLoss.append(numpyGraphValueLoss)    
-
-    numpyGraphPolicyLoss = lines[numpyGraphPolicyLossIndices-batchSize*i].strip()
-    numpyGraphPolicyLoss = [float(i) for i in numpyGraphPolicyLoss[1:-1].split(", ")]
-    allNumpyGraphPolicyLoss.append(numpyGraphPolicyLoss)
-
-    episodeLength = lines[numpyGraphValueLossIndices-batchSize*i].strip()
+    episodeLength = lines[episodeLengthIndices - (batchSize * i)].strip()
     episodeLength = [float(i) for i in episodeLength[1:-1].split(", ")] 
     allEpisodeLength.append(episodeLength)
 
+    numpyGraphPolicyLoss = lines[numpyGraphPolicyLossIndices - (batchSize * i)].strip()
+    numpyGraphPolicyLoss = [float(i) for i in numpyGraphPolicyLoss[1:-1].split(", ")]
+    allNumpyGraphPolicyLoss.append(numpyGraphPolicyLoss)
+
+    numpyGraphValueLoss = lines[numpyGraphValueLossIndices - (batchSize * i)].strip()
+    numpyGraphValueLoss = [float(i) for i in numpyGraphValueLoss[1:-1].split(", ")] 
+    allNumpyGraphValueLoss.append(numpyGraphValueLoss)    
+
+    graphEpisodeReward = lines[graphEpisodeRewardsIndices - (batchSize * i)].strip() 
+    # for all value in all EpisodeReward in all training
+    graphEpisodeReward = [[float(i)for i in EpisodeReward.split(", ")] for EpisodeReward in graphEpisodeReward[2:-2].split("], [")]
+    allGraphEpisodeReward.append(graphEpisodeReward)    
+
+    num_epochs = float(lines[num_epochsIndicies - (batchSize * i)].strip())
+    allNum_epochs.append(num_epochs)
+
+
+
+
+    
+    """
     graphRewards = lines[graphEpisodeRewardIndices-batchSize*i].strip()
     graphRewards = [float(i) for i in graphRewards[1:-1].split(", ")] # .split(", ") supp the useless part
     allGraphRewards.append(graphRewards)
+    """
 
 
-#cumulative_reward(allGraphRewards)
-#Reward(allGraphRewards)
-#episode_length(allEpisodeLength)
+cumulative_reward(allGraphEpisodeReward)
 
-#policy_loss(numpyGraphPolicyLoss, num_epochs)
+Reward(allGraphEpisodeReward)
 
-#value_loss(numpyGraphValueLoss, num_epochs)
+episode_length(allEpisodeLength)
 
-episodeReward(allGraphEpisodeReward, allNum_epochs)
+policy_loss(numpyGraphPolicyLoss, num_epochs)
+
+value_loss(numpyGraphValueLoss, num_epochs)
+
+#episodeReward(allGraphEpisodeReward, allNum_epochs)

@@ -563,15 +563,16 @@ def PPO_loss(subdata, advantages, model1):
     return policy_loss
 
 # reset() is link to the ppo | env.reload() is the reset for the agent/environnement
-def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, episodeReward, graphEpisodeReward):
-    episodeLength.append(episode_count_frames)
+def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, graphEpisodeReward):
+    episodeLength.append(len(graphRewards))
     episode_count_frames = 0
-    graphEpisodeReward.append(episodeReward)
-    episodeReward = 0
+    graphEpisodeReward.append(graphRewards)
+    #print(graphEpisodeReward)
+    graphRewards = []
 
     env.reload()
 
-    return episode_count_frames,episodeReward,graphEpisodeReward
+    return episode_count_frames,graphEpisodeReward,graphRewards
     #print(f"Over {max_training_frames} frames : reset")
 
 
@@ -585,7 +586,6 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     graphValueLoss = []
     graphPolicyLoss = []
     graphEpisodeReward = []
-    episodeReward = 0
 
     Won = 0
 
@@ -604,7 +604,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         # limit episode length
         if episode_count_frames >= max_training_frames:
             D_buffer.clear_buffer()
-            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
+        
         # take info
         Data = env.observe()          # data = state = s
 
@@ -618,7 +619,6 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         # choose randomly one action while taking the probability
         action_dist = torch.distributions.Categorical(action_probs)
         action = action_dist.sample().item()        # action = a
-        #print(action)
         env.apply_action(action)
 
         # update the joint position
@@ -629,11 +629,12 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         
         
         focus_position , _ = p.getBasePositionAndOrientation(env.spider)
-            
+        """
         p.resetDebugVisualizerCamera(cameraDistance=15,
                                     cameraYaw=0,
                                     cameraPitch=-40,
                                     cameraTargetPosition = focus_position)
+        """
 
         p.stepSimulation()
         #time.sleep(1./240.)
@@ -647,24 +648,23 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         reward, done, won = env.compute_reward(next_state,Data,episode_count_frames)     # reward = r
 
+
         graphRewards.append(reward)
-        episodeReward += reward
 
         
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
             #D_buffer.clear_buffer()
-            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
 
         elif won:
             #D_buffer.clear_buffer()
-            episode_count_frames, episodeReward,graphEpisodeReward = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards, episodeReward,graphEpisodeReward)
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
 
             Won += 1
             print(" - - DONE - - ")
 
         #print(f"reward : {reward}")
-        #print(f"episode reward : {episodeReward}")
         #print(f"episode reward : {graphEpisodeReward}")
 
         # learning loop
@@ -723,7 +723,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         #time.sleep(1./240.)
     print(f"Number of Finish Episode : {Won}")
 
-    graphRewards         = [round(num, 3) for num in graphRewards]
+    #graphRewards         = [round(num, 3) for num in graphRewards]
     episodeLength        = [round(num, 3) for num in episodeLength]
 
     numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().tolist()
@@ -737,14 +737,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
     with open("save.txt", "a") as saveFile:
 
         saveFile.write("----\n")
-        """
-        saveFile.write(f"graphRewards = ({graphRewards}).\n")
-        saveFile.write(f"episodeLength = ({episodeLength}).\n")
-        saveFile.write(f"numpyGraphPolicyLoss = ({numpyGraphPolicyLoss}).\n")
-        saveFile.write(f"numpyGraphValueLoss = ({numpyGraphValueLoss}).\n")
-        saveFile.write(f"num_epochs = ({num_epochs}).\n")"""
 
-        saveFile.write(f"{graphRewards}\n")
+        #saveFile.write(f"{graphRewards}\n")
         saveFile.write(f"{episodeLength}\n")
         saveFile.write(f"{numpyGraphPolicyLoss}\n")
         saveFile.write(f"{numpyGraphValueLoss}\n")
@@ -870,14 +864,13 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-"""
-frames_per_batch = 4000
-buffer_Collect_Size = 1000
+
+frames_per_batch = 15000
+buffer_Collect_Size = 1500
 num_epochs = 10
-sub_batch_size = 500
-max_training_frames = 1000
+sub_batch_size = 750
+max_training_frames = 3000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-"""
 
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
