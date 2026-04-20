@@ -228,6 +228,10 @@ def episodeReward(allEpisodeReward,num_epochs):
     for episodeReward in allEpisodeReward:
         total = 0
         cumulative = []
+        #episodeRewardMin  = min(episodeReward)
+        #episodeRewardMax  = max(episodeReward)
+        #episodeRewardMean = sum(episodeReward)/len(episodeReward)
+        #print(len(allEpisodeReward))
         
         ax.plot(episodeReward, color = orange_dark, zorder = zorder, alpha = alpha,linewidth = linewidth)
         ax.fill_between(range(len(episodeReward)), np.array(episodeReward), where = np.array(episodeReward) > 0, color = yellow, alpha = alpha/4, interpolate = True, zorder = zorder-3)
@@ -299,12 +303,12 @@ for i in range(batch):
     allGraphRewards.append(graphRewards)
 
 
-cumulative_reward(allGraphRewards)
-Reward(allGraphRewards)
-episode_length(allEpisodeLength)
+#cumulative_reward(allGraphRewards)
+#Reward(allGraphRewards)
+#episode_length(allEpisodeLength)
 
-policy_loss(numpyGraphPolicyLoss, num_epochs)
+#policy_loss(numpyGraphPolicyLoss, num_epochs)
 
-value_loss(numpyGraphValueLoss, num_epochs)
+#value_loss(numpyGraphValueLoss, num_epochs)
 
 episodeReward(allGraphEpisodeReward, allNum_epochs)

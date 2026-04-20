@@ -44,10 +44,13 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 2
-        self.goalReward = 1
+        self.penaltie = 0.2
+        self.goalReward = 0.5
         self.checkpoint = 0
         self.checkpointMultiplier = 1
+
+        self.secondDistanceGoal = 0
+        self.secondSoftDelta = 0
 
         self.size = 10
         self.border = 8
@@ -236,20 +239,23 @@ class Env():
             elif i in self.joint_ids_second_legs:
                 self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
 
-    def compute_reward(self, nextState,oldState):
+    def compute_reward(self, nextState,oldState, frames):
 
         won = False
         done = False
         reward = 0
 
-        firstDistanceGoal = self.reload_Distance
-        
+        resetDistanceGoal = self.reload_Distance
 
-        distance90Percent = firstDistanceGoal * (90/100)
-        distance80Percent = firstDistanceGoal * (80/100)
-        distance65Percent = firstDistanceGoal * (65/100)
-        distance50Percent = firstDistanceGoal * (50/100)
-        distance35Percent = firstDistanceGoal * (35/100)
+        firstDistanceGoal = 0
+        firstSoftDelta = 0
+
+
+        distance90Percent = resetDistanceGoal * (90/100)
+        distance80Percent = resetDistanceGoal * (80/100)
+        distance65Percent = resetDistanceGoal * (65/100)
+        distance50Percent = resetDistanceGoal * (50/100)
+        distance35Percent = resetDistanceGoal * (35/100)
 
 
         # get base orientation for the flip check
@@ -269,10 +275,6 @@ class Env():
         distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
 
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
-        """
-        if height >0.45:
-            reward += 0.05
-        """
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -282,6 +284,10 @@ class Env():
 
         # reset for high pitch
         if rotationPitch > self.maxRotation or rotationPitch < -self.maxRotation:  
+            reward -= self.penaltie
+            done = True
+
+        if height < 0.4 :
             reward -= self.penaltie
             done = True
 
@@ -341,25 +347,47 @@ class Env():
                 reward += self.goalReward * 5
                 won = True
 
+        framesCheck = 30
+        if frames%framesCheck == 0:
+            #print(frames)
+            firstDistanceGoal = resetDistanceGoal - distance
+            
+            # Calculate DELTA
+            firstSoftDelta = firstDistanceGoal - self.secondDistanceGoal # delta
 
-        """
-        delta = (OldDistance - distance)*10
-        delta = min(delta, 3)
+            self.secondDistanceGoal = firstDistanceGoal # shift of distance
 
+            # calculate Delta interval to limit big reward when falling
+            deltaInterval = firstSoftDelta - self.secondSoftDelta
+
+            self.secondSoftDelta = firstSoftDelta
+            #print(round(deltaInterval,4))
+
+            if deltaInterval < 0.5:
+                #print()
+                if firstSoftDelta > 0.005:
+                    reward += firstSoftDelta * 2 
+
+                else :
+                    reward += firstSoftDelta
+
+            """
+            else : 
+                print(f"firstDistanceGoal  : {firstDistanceGoal}")
+                print(f"secondDistanceGoal : {self.secondDistanceGoal}")
+                print(f"firstSoftDelta : {firstSoftDelta}")
+                print(f"secondSoftDelta : {self.secondSoftDelta}")
+                print(deltaInterval)
+            """
+
+            """
+            firstDeltaClip = firstSoftDelta - self.secondDistanceGoal
+
+            self.secondSoftDelta = firstSoftDelta
+            """
+
+            #print(f"reward : {reward}")
         
-        #print(delta)
-
-        distanceDone = distanceDone / 2
-
-        reward += delta * self.checkpointMultiplier
-        reward += distanceDone * self.checkpointMultiplier
-        #print(distanceDone)
-        """
-        
-        distanceDone = firstDistanceGoal - distance
-        reward += distanceDone * self.checkpointMultiplier
-
-        print(f"reward : {reward}")
         return reward, done, won
 
 # --- PPO ---
@@ -617,7 +645,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         next_state = env.observe()      # next_state = s'
 
-        reward, done, won = env.compute_reward(next_state,Data)     # reward = r
+        reward, done, won = env.compute_reward(next_state,Data,episode_count_frames)     # reward = r
 
         graphRewards.append(reward)
         episodeReward += reward
@@ -875,7 +903,7 @@ while True:
         frames_per_batch = 1_000_000
         buffer_Collect_Size = 8192
         num_epochs = 8
-        sub_batch_size = 2048
+        sub_batch_size = 4096
         max_training_frames = 8192
 
         print("\nGo for training")
