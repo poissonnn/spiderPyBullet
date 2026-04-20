@@ -1,8 +1,7 @@
+from gymnasium.spaces import MultiDiscrete
 import numpy as np
 
-reward = [10,40,0,0,0,0,0,0,0,0-87,-78,5,8,9,7,2,4,6,4,48]
+observation_space = MultiDiscrete(np.array([3] * 12))
+for i in range(10):
 
-
-print(max(reward))
-print(min(reward))
-print(sum(reward)/len(reward))
+    print(observation_space.sample())

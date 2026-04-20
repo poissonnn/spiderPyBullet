@@ -116,7 +116,7 @@ def Reward(allGraphRewards):
     for graphRewards in allGraphRewards:
         for rewards in graphRewards:
 
-            rewardsMax = max([rewards])
+            rewardsMax = max(rewards)
             allRewardsMax.append(rewardsMax)
 
             rewardsMin = min(rewards)

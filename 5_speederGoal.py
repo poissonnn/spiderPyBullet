@@ -151,7 +151,10 @@ class Env():
             targetPositions=self.target
         )
 
-        # -- goal distance --
+        self.secondDistanceGoal = 0   # ← ajouter
+        self.secondSoftDelta = 0
+
+        # -- GOAL DISTANCE --
         # use after for the reward
         self.checkpoint = 0
 
@@ -304,7 +307,7 @@ class Env():
             """
             if distance < distance90Percent and self.checkpoint == 0:
                 self.checkpoint = 1
-                reward += self.goalReward
+                reward += self.goalReward / 4
 
                 self.checkpointMultiplier = 2
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
@@ -312,7 +315,7 @@ class Env():
 
             if distance < distance80Percent and self.checkpoint == 1:
                 self.checkpoint = 2
-                reward += self.goalReward * 1.5
+                reward += self.goalReward * 1
 
                 self.checkpointMultiplier = 1.5
                 print(f"Reward Multiplier : {self.checkpointMultiplier}")
@@ -363,7 +366,7 @@ class Env():
             self.secondSoftDelta = firstSoftDelta
             #print(round(deltaInterval,4))
 
-            if deltaInterval < 0.5:
+            if deltaInterval < 0.05:
                 #print()
                 if firstSoftDelta > 0.005:
                     reward += firstSoftDelta * 2 
@@ -636,7 +639,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
                                     cameraTargetPosition = focus_position)
         """
 
-        p.stepSimulation()
+        for i in range(5):
+            p.stepSimulation()
         #time.sleep(1./240.)
         # --- after action ---
 
@@ -858,20 +862,20 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
-
+# 3 * 12 action | ia choose for each joint if it wants to go increase, decrease the joint angle or do nothing
 model1 = ActorCritic(state_dim=38, action_dim=24)
 optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-
+"""
 frames_per_batch = 15000
 buffer_Collect_Size = 1500
 num_epochs = 10
 sub_batch_size = 750
 max_training_frames = 3000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-
+"""
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
