@@ -208,27 +208,11 @@ class Env():
         return np.array(self.state, dtype=np.float32)
 
     def apply_action(self,action):
-        # 0 -> 23
         #action = 24
-        action +=1
-        # 1 -> 24
 
-        #print(action)
 
-        if action == 25:
-            print("Debug Session")
-            p.disconnect()
-            pass
+        print(action)
 
-        elif action > 12 and action != 25:
-            # 13 -> 24
-            action -= 12
-            # 1 -> 12
-            self.target[action] -= self.stepMouvement   
-
-        else :
-            # 1 -> 12
-            self.target[action] += self.stepMouvement  
 
         # clip all the joint depending of their joint types
         for i in range(self.len_joint_ids):
@@ -429,8 +413,8 @@ class ActorCritic(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 4, action_dim),
-            nn.Softmax(dim=-1)
+            nn.Linear(hidden_dim // 4, sum(action_dim)),
+            #nn.Softmax(dim=-1)
         )
 
         # 256 hidden neurone -> 128 hidden neurone -> 64 hidden neurone -> 32 hidden neurone -> 1 estimation of how many point the future ia can win
@@ -619,10 +603,27 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         action_probs, state_value = model1(state_tensor)
         state_value = state_value.detach().item()
 
-        # choose randomly one action while taking the probability
-        action_dist = torch.distributions.Categorical(action_probs)
-        action = action_dist.sample().item()        # action = a
+        # 32 output to 12 groups of 3 kinds of inputs
+        split_action = torch.split(action_probs, nvec)
+
+        action = []
+        log_prob = 0
+
+        # for each groups of input
+        for groups in split_action:
+            groupsActionProbalities = softmax(groups)
+            action_dist = torch.distributions.Categorical(groupsActionProbalities)  
+            
+            sample_action = action_dist.sample()
+
+            action.append(sample_action.item()) # action = a
+
+            # use later for the ppo 
+            #(to know at which point the policy what thinking if it was right)
+            log_prob += action_dist.log_prob(sample_action).item()
+
         env.apply_action(action)
+
 
         # update the joint position
         p.setJointMotorControlArray(env.spider,
@@ -644,14 +645,9 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         #time.sleep(1./240.)
         # --- after action ---
 
-        # use later for the ppo 
-        #(to know at which point the policy what thinking if it was right)
-        log_prob = action_dist.log_prob(torch.tensor(action, dtype=torch.int64)).item()
-
         next_state = env.observe()      # next_state = s'
 
         reward, done, won = env.compute_reward(next_state,Data,episode_count_frames)     # reward = r
-
 
         graphRewards.append(reward)
 
@@ -863,19 +859,23 @@ def DEBUG(env):
 
 
 # 3 * 12 action | ia choose for each joint if it wants to go increase, decrease the joint angle or do nothing
-model1 = ActorCritic(state_dim=38, action_dim=24)
+nvec = [3] * 12
+print(nvec)
+
+softmax = nn.Softmax(dim=-1)
+model1 = ActorCritic(state_dim=38, action_dim=nvec)
 optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-"""
+
 frames_per_batch = 15000
 buffer_Collect_Size = 1500
 num_epochs = 10
 sub_batch_size = 750
 max_training_frames = 3000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-"""
+
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
