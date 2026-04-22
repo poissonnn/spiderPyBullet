@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 
+import pandas as pd
+
 red_dark    = [97 /255, 0  /255, 6  /255]
 red_light   = [220/255, 100/255, 100/255]
 orange_dark = [214/255, 40 /255, 40 /255]
@@ -99,7 +101,8 @@ def cumulative_reward(allGraphRewards):
     plt.savefig("Graph/cumulative_reward.png")
     plt.close()
 
-def Reward(allGraphRewards):
+def Reward(allGraphRewards, window = 20):
+    print("reward graph")
     plt.close()
 
     alpha = 1
@@ -112,7 +115,7 @@ def Reward(allGraphRewards):
     allRewardsMean = []
     allRewardsMax  = []
     allRewardsMin  = []
-
+    """
     for graphRewards in allGraphRewards:
         for rewards in graphRewards:
 
@@ -124,10 +127,24 @@ def Reward(allGraphRewards):
 
             rewardsMean = sum(rewards)/len(rewards)
             allRewardsMean.append(rewardsMean)
+    """
+    for rewards in allGraphRewards[0]:
+        rewardsMax = max(rewards)
+        allRewardsMax.append(rewardsMax)
+
+        rewardsMin = min(rewards)
+        allRewardsMin.append(rewardsMin)
+
+        rewardsMean = sum(rewards)/len(rewards)
+        allRewardsMean.append(rewardsMean)
+
+    smoothMean = pd.Series(allRewardsMean).rolling(window = window, min_periods=1).mean()
+    smoothMax  =  pd.Series(allRewardsMax).rolling(window = window, min_periods=1).mean()
+    smoothMin  =  pd.Series(allRewardsMin).rolling(window = window, min_periods=1).mean()
         
-    ax.plot(range(len(allRewardsMean)), allRewardsMean, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
+    ax.plot(range(len(smoothMean)), smoothMean, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
     # x values, y lower values, y upper values
-    ax.fill_between(range(len(allRewardsMean)), allRewardsMin, allRewardsMax, color = blue_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
+    #ax.fill_between(range(len(smoothMean)), smoothMin, smoothMax, color = blue_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
 
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5, alpha = alpha)

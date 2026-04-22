@@ -1,0 +1,146 @@
+        won = False
+        done = False
+        reward = 0
+
+        resetDistanceGoal = self.reload_Distance
+
+        firstDistanceGoal = 0
+        firstSoftDelta = 0
+
+
+        distance90Percent = resetDistanceGoal * (90/100)
+        distance80Percent = resetDistanceGoal * (80/100)
+        distance65Percent = resetDistanceGoal * (65/100)
+        distance50Percent = resetDistanceGoal * (50/100)
+        distance35Percent = resetDistanceGoal * (35/100)
+
+
+        # get base orientation for the flip check
+        self.linkState = p.getLinkState(self.spider,0)
+
+        orientation = self.linkState[1]
+        euler = p.getEulerFromQuaternion(orientation)
+
+        # variable for the fall and flip detection
+        height        = self.linkState[0][2]
+        rotationPitch = euler[1]
+        rotationRoll  = euler[0]
+
+
+        # --- delta calculation ---
+        # variable for the deplacement detection
+        distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
+
+        OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
+        
+        # --- pitch/roll/height check ---
+        # reset for high roll
+        if rotationRoll > self.maxRotation or rotationRoll < -self.maxRotation:
+            reward -= self.penaltie
+            done = True
+
+        # reset for high pitch
+        if rotationPitch > self.maxRotation or rotationPitch < -self.maxRotation:  
+            reward -= self.penaltie
+            done = True
+
+        if height < 0.4 :
+            reward -= self.penaltie
+            done = True
+
+        # --- distance check ---
+        if not done :
+            """
+            print(f"distance90 : {distance90Percent}")
+            print(f"distance80 : {distance80Percent}")
+            print(f"distance65 : {distance65Percent}")
+            print(f"distance50 : {distance50Percent}")
+            print(f"distance35 : {distance35Percent}")
+            
+            print(f"distance : {distance}")
+            """
+            if distance < distance90Percent and self.checkpoint == 0:
+                self.checkpoint = 1
+                reward += self.goalReward / 4
+
+                self.checkpointMultiplier = 2
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
+                print("checkpoint 1")
+
+            if distance < distance80Percent and self.checkpoint == 1:
+                self.checkpoint = 2
+                reward += self.goalReward * 1
+
+                self.checkpointMultiplier = 1.5
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
+                print("checkpoint 2")
+
+            if distance < distance65Percent and self.checkpoint == 2:
+                self.checkpoint = 3
+                reward += self.goalReward * 2
+
+                self.checkpointMultiplier = 1.75
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
+                print("checkpoint 3")
+
+            if distance < distance50Percent and self.checkpoint == 3:
+                self.checkpoint = 4
+                reward += self.goalReward * 3
+
+                self.checkpointMultiplier = 2
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
+                print("checkpoint 4")
+            
+            if distance < distance35Percent and self.checkpoint == 4:
+                self.checkpoint = 5
+                reward += self.goalReward * 4
+
+                self.checkpointMultiplier = 2.5
+                print(f"Reward Multiplier : {self.checkpointMultiplier}")
+                print("checkpoint 5")
+
+            # win
+            if distance < 2.5 :
+                reward += self.goalReward * 5
+                won = True
+
+        framesCheck = 30
+        if frames%framesCheck == 0:
+            #print(frames)
+            firstDistanceGoal = resetDistanceGoal - distance
+            
+            # Calculate DELTA
+            firstSoftDelta = firstDistanceGoal - self.secondDistanceGoal # delta
+
+            self.secondDistanceGoal = firstDistanceGoal # shift of distance
+
+            # calculate Delta interval to limit big reward when falling
+            deltaInterval = firstSoftDelta - self.secondSoftDelta
+
+            self.secondSoftDelta = firstSoftDelta
+            #print(round(deltaInterval,4))
+
+            if deltaInterval < 0.05:
+                #print()
+                if firstSoftDelta > 0.005:
+                    reward += firstSoftDelta * 2 
+
+                else :
+                    reward += firstSoftDelta
+
+            """
+            else : 
+                print(f"firstDistanceGoal  : {firstDistanceGoal}")
+                print(f"secondDistanceGoal : {self.secondDistanceGoal}")
+                print(f"firstSoftDelta : {firstSoftDelta}")
+                print(f"secondSoftDelta : {self.secondSoftDelta}")
+                print(deltaInterval)
+            """
+
+            """
+            firstDeltaClip = firstSoftDelta - self.secondDistanceGoal
+
+            self.secondSoftDelta = firstSoftDelta
+            """
+
+            #print(f"reward : {reward}")

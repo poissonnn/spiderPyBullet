@@ -44,7 +44,7 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 0.2
+        self.penaltie = 1
         self.goalReward = 0.5
         self.checkpoint = 0
         self.checkpointMultiplier = 1
@@ -61,7 +61,7 @@ class Env():
 
         self.clip_base_legs =   [-1.5708 , 1.5708]
         self.clip_first_legs =  [-1.2217 , 0.7854]
-        self.clip_second_legs = [-1.5708 , 1.1344]
+        self.clip_second_legs = [-1.3962 , 1.1344]
 
         self.joint_ids = [0,1,2,3,4,5,6,7,8,9,10,11,12]
 
@@ -249,14 +249,6 @@ class Env():
         firstDistanceGoal = 0
         firstSoftDelta = 0
 
-
-        distance90Percent = resetDistanceGoal * (90/100)
-        distance80Percent = resetDistanceGoal * (80/100)
-        distance65Percent = resetDistanceGoal * (65/100)
-        distance50Percent = resetDistanceGoal * (50/100)
-        distance35Percent = resetDistanceGoal * (35/100)
-
-
         # get base orientation for the flip check
         self.linkState = p.getLinkState(self.spider,0)
 
@@ -268,12 +260,12 @@ class Env():
         rotationPitch = euler[1]
         rotationRoll  = euler[0]
 
-
         # --- delta calculation ---
         # variable for the deplacement detection
         distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
-
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
+
+        delta = (OldDistance - distance) * 1
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -292,55 +284,10 @@ class Env():
 
         # --- distance check ---
         if not done :
-            """
-            print(f"distance90 : {distance90Percent}")
-            print(f"distance80 : {distance80Percent}")
-            print(f"distance65 : {distance65Percent}")
-            print(f"distance50 : {distance50Percent}")
-            print(f"distance35 : {distance35Percent}")
+
+            reward += delta
+            #print(delta)
             
-            print(f"distance : {distance}")
-            """
-            if distance < distance90Percent and self.checkpoint == 0:
-                self.checkpoint = 1
-                reward += self.goalReward / 4
-
-                self.checkpointMultiplier = 2
-                print(f"Reward Multiplier : {self.checkpointMultiplier}")
-                print("checkpoint 1")
-
-            if distance < distance80Percent and self.checkpoint == 1:
-                self.checkpoint = 2
-                reward += self.goalReward * 1
-
-                self.checkpointMultiplier = 1.5
-                print(f"Reward Multiplier : {self.checkpointMultiplier}")
-                print("checkpoint 2")
-
-            if distance < distance65Percent and self.checkpoint == 2:
-                self.checkpoint = 3
-                reward += self.goalReward * 2
-
-                self.checkpointMultiplier = 1.75
-                print(f"Reward Multiplier : {self.checkpointMultiplier}")
-                print("checkpoint 3")
-
-            if distance < distance50Percent and self.checkpoint == 3:
-                self.checkpoint = 4
-                reward += self.goalReward * 3
-
-                self.checkpointMultiplier = 2
-                print(f"Reward Multiplier : {self.checkpointMultiplier}")
-                print("checkpoint 4")
-            
-            if distance < distance35Percent and self.checkpoint == 4:
-                self.checkpoint = 5
-                reward += self.goalReward * 4
-
-                self.checkpointMultiplier = 2.5
-                print(f"Reward Multiplier : {self.checkpointMultiplier}")
-                print("checkpoint 5")
-
             # win
             if distance < 2.5 :
                 reward += self.goalReward * 5
@@ -365,28 +312,13 @@ class Env():
             if deltaInterval < 0.05:
                 #print()
                 if firstSoftDelta > 0.005:
-                    reward += firstSoftDelta * 2 
+                    reward += firstSoftDelta * 5
+                    #print(f"soft delta : {firstSoftDelta}")
 
                 else :
                     reward += firstSoftDelta
+                    #print(f"soft delta : {firstSoftDelta}")
 
-            """
-            else : 
-                print(f"firstDistanceGoal  : {firstDistanceGoal}")
-                print(f"secondDistanceGoal : {self.secondDistanceGoal}")
-                print(f"firstSoftDelta : {firstSoftDelta}")
-                print(f"secondSoftDelta : {self.secondSoftDelta}")
-                print(deltaInterval)
-            """
-
-            """
-            firstDeltaClip = firstSoftDelta - self.secondDistanceGoal
-
-            self.secondSoftDelta = firstSoftDelta
-            """
-
-            #print(f"reward : {reward}")
-        
         return reward, done, won
 
 # --- PPO ---
@@ -558,7 +490,7 @@ def PPO_loss(subdata, advantages, model1):
 
     #print(surrogate_loss_1)
 
-    surrogate_loss_2 = torch.clamp(policy_ratio, 1-clip_epsilon, 1+clip_epsilon) * advantages
+    surrogate_loss_2 = torch.clamp(policy_ratio, 1-clip_epsilon, 1+clip_epsilon) * advantages.detach()
 
     #print(surrogate_loss_2)
 
@@ -612,7 +544,7 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         # limit episode length
         if episode_count_frames >= max_training_frames:
-            D_buffer.clear_buffer()
+            #D_buffer.clear_buffer()
             episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
         
         # take info
@@ -840,14 +772,14 @@ def DEBUG(env):
         if ord('d') in keys : 
             action = [1 ,1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2]
 
-        """
-        if ord('f') in keys:
+        
+        if ord('b') in keys:
             linkState = p.getLinkState(env.spider,0)
             print()
             for i in range(4):
                 print(i)
                 print(round(linkState[1][i],2))
-        """
+        
         env.apply_action(action)
 
         linkState = p.getLinkState(env.spider,0)
@@ -860,9 +792,9 @@ def DEBUG(env):
             height_penalty = -abs(minHeight - height) * 3
 
         euler = p.getEulerFromQuaternion(orientation)
-        #print(f"roll  : {round(radian(euler[1]), 1)}")
-        #print(f"pitch : {round(radian(euler[0]), 1)}")
-        #print(f"yaw   : {round(radian(euler[2]), 1)}")
+        print(f"roll  : {round(radian(euler[1]), 1)}")
+        print(f"pitch : {round(radian(euler[0]), 1)}")
+        print(f"yaw   : {round(radian(euler[2]), 1)}")
         """
         if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
             print(linkState[0][2])
@@ -889,7 +821,6 @@ def DEBUG(env):
 
 # 3 * 12 action | ia choose for each joint if it wants to go increase, decrease the joint angle or do nothing
 nvec = [3] * 12
-print(nvec)
 
 softmax = nn.Softmax(dim=-1)
 model1 = ActorCritic(state_dim=38, action_dim=nvec)
@@ -897,14 +828,14 @@ optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
-
+"""
 frames_per_batch = 15000
 buffer_Collect_Size = 1500
 num_epochs = 10
 sub_batch_size = 750
 max_training_frames = 3000
 training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-
+"""
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
@@ -927,10 +858,10 @@ while True:
     elif QuestionAction == 1:
 
         frames_per_batch = 1_000_000
-        buffer_Collect_Size = 4096
+        buffer_Collect_Size = 8196
         num_epochs = 8
-        sub_batch_size = 2048
-        max_training_frames = 8192
+        sub_batch_size = 4096
+        max_training_frames = 5000
 
         print("\nGo for training")
 
