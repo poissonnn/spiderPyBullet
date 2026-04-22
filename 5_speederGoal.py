@@ -56,8 +56,8 @@ class Env():
         self.border = 8
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
-        self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
-        self.joint_ids_second_legs = [3, 6, 9, 12] # -65 // 90 | -1.1344 // 1.5708
+        self.joint_ids_first_legs =  [2, 5, 8, 11] # -70 // 45 | -1.2217 // 0.7854
+        self.joint_ids_second_legs = [3, 6, 9, 12] # -90 // 65 | -1.5708 // 1.1344
 
         self.clip_base_legs =   [-1.5708 , 1.5708]
         self.clip_first_legs =  [-1.2217 , 0.7854]
@@ -209,13 +209,25 @@ class Env():
 
     def apply_action(self,action):
         #action = 24
+        #print(action)
+        for i in range(len(action)):
+            #print(f"action : {action[i]}")
 
+            if action[i] == 0:
+                #print("+")
+                self.target[i+1] += self.stepMouvement   
 
-        print(action)
+            elif action[i] == 1:
+                #print("0")
+                pass
+
+            elif action[i] == 2:
+                #print("-")
+                self.target[i+1] -= self.stepMouvement   
 
 
         # clip all the joint depending of their joint types
-        for i in range(self.len_joint_ids):
+        for i in range(1, self.len_joint_ids):
 
             if i in self.joint_ids_base_legs:
                 self.target[i] = min(max(self.target[i], self.clip_base_legs[0]) , self.clip_base_legs[1])
@@ -524,10 +536,20 @@ def PPO_loss(subdata, advantages, model1):
     action_tensor = torch.tensor(action, dtype=torch.int64)
     state_tensor = torch.tensor(states, dtype=torch.float32)  # everything in tensor for the next math
 
-    action_probs, _ = model1(state_tensor)
-    action_dist = torch.distributions.Categorical(action_probs)
 
-    new_log_prob = action_dist.log_prob(action_tensor)
+    # recalculate the log prob
+
+    action_probs, _ = model1(state_tensor)
+    split_action = torch.split(action_probs, nvec, dim=1)
+
+    new_log_prob = torch.zeros(action_tensor.shape[0])
+    for i,groups in enumerate(split_action):
+
+        groupsActionProbalities = softmax(groups)
+        action_dist = torch.distributions.Categorical(groupsActionProbalities)  
+
+        new_log_prob += action_dist.log_prob(action_tensor[:, i])
+
     old_log_prob = torch.tensor(old_log_prob, dtype=torch.float32)
 
     policy_ratio = torch.exp(new_log_prob - old_log_prob)
@@ -787,39 +809,46 @@ def DEBUG(env):
         print(f"{jupper} -> {jupperDegree}")
         print()
 
+
     while True:
         
         
         keys = p.getKeyboardEvents()
 
+        action = [1] * 12
+
         if ord('x') in keys:
             env.reload()
             
+        if ord('r') in keys :
+            action = [0 ,1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1]
 
-        if ord('e') in keys :
-            env.apply_action(1)
-            env.apply_action(4)  
-            env.apply_action(7)  
-            env.apply_action(10)      
+        if ord('f') in keys :
+            action = [2 ,1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1]
 
-        if ord('d') in keys :
-            env.apply_action(13)
-            env.apply_action(16)  
-            env.apply_action(19)  
-            env.apply_action(22)    
 
         if ord('o') in keys : 
-            cameraPitch += 0.2
+            action = [1 ,0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1]
         
         if ord('l') in keys : 
-            cameraPitch -= 0.2
+            action = [1 ,2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1]
 
+
+        if ord('e') in keys : 
+            action = [1 ,1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0]
+        
+        if ord('d') in keys : 
+            action = [1 ,1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2]
+
+        """
         if ord('f') in keys:
             linkState = p.getLinkState(env.spider,0)
             print()
             for i in range(4):
                 print(i)
                 print(round(linkState[1][i],2))
+        """
+        env.apply_action(action)
 
         linkState = p.getLinkState(env.spider,0)
 
@@ -898,9 +927,9 @@ while True:
     elif QuestionAction == 1:
 
         frames_per_batch = 1_000_000
-        buffer_Collect_Size = 8192
+        buffer_Collect_Size = 4096
         num_epochs = 8
-        sub_batch_size = 4096
+        sub_batch_size = 2048
         max_training_frames = 8192
 
         print("\nGo for training")
