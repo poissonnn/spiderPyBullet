@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import os
 import time
 import random
+import psutil
 import math
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -23,11 +24,17 @@ import visual
 
 def radian(x):
     return 180 * x / np.pi
-
+"""
+saveFile = open("save.txt")    
+saveFile.close()
+"""
 path = r"/home/fish/FISH/prod/code/python/PyBullet/Drone"
-
+graphPath = r"/home/fish/FISH/prod/code/python/PyBullet/Graph"
 if not os.path.exists(path):
     os.makedirs(path)
+
+if not os.path.exists(graphPath):
+    os.makedirs(graphPath)
 
 # --- PYBULLET ---
 
@@ -38,21 +45,24 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 2
-        self.goalReward = 2
+        self.penaltie = 1
+        self.goalReward = 0.5
         self.checkpoint = 0
         self.checkpointMultiplier = 1
 
+        self.secondDistanceGoal = 0
+        self.secondSoftDelta = 0
+
         self.size = 10
-        self.border = 7
+        self.border = 8
 
         self.joint_ids_base_legs =   [1, 4, 7, 10] # -90 // 90 | -1.5708 // 1.5708
-        self.joint_ids_first_legs =  [2, 5, 8, 11] # -45 // 70 | -0.7853 // 1.2217
-        self.joint_ids_second_legs = [3, 6, 9, 12] # -65 // 90 | -1.1344 // 1.5708
+        self.joint_ids_first_legs =  [2, 5, 8, 11] # -70 // 45 | -1.2217 // 0.7854
+        self.joint_ids_second_legs = [3, 6, 9, 12] # -90 // 65 | -1.5708 // 1.1344
 
         self.clip_base_legs =   [-1.5708 , 1.5708]
         self.clip_first_legs =  [-1.2217 , 0.7854]
-        self.clip_second_legs = [-1.5708 , 1.1344]
+        self.clip_second_legs = [-1.3962 , 1.1344]
 
         self.joint_ids = [0,1,2,3,4,5,6,7,8,9,10,11,12]
 
@@ -142,7 +152,10 @@ class Env():
             targetPositions=self.target
         )
 
-        # -- goal distance --
+        self.secondDistanceGoal = 0   # ← ajouter
+        self.secondSoftDelta = 0
+
+        # -- GOAL DISTANCE --
         # use after for the reward
         self.checkpoint = 0
 
@@ -196,30 +209,26 @@ class Env():
         return np.array(self.state, dtype=np.float32)
 
     def apply_action(self,action):
-        # 0 -> 23
         #action = 24
-        action +=1
-        # 1 -> 24
-
         #print(action)
+        for i in range(len(action)):
+            #print(f"action : {action[i]}")
 
-        if action == 25:
-            print("Debug Session")
-            p.disconnect()
-            pass
+            if action[i] == 0:
+                #print("+")
+                self.target[i+1] += self.stepMouvement   
 
-        elif action > 12 and action != 25:
-            # 13 -> 24
-            action -= 12
-            # 1 -> 12
-            self.target[action] -= self.stepMouvement   
+            elif action[i] == 1:
+                #print("0")
+                pass
 
-        else :
-            # 1 -> 12
-            self.target[action] += self.stepMouvement  
+            elif action[i] == 2:
+                #print("-")
+                self.target[i+1] -= self.stepMouvement   
+
 
         # clip all the joint depending of their joint types
-        for i in range(self.len_joint_ids):
+        for i in range(1, self.len_joint_ids):
 
             if i in self.joint_ids_base_legs:
                 self.target[i] = min(max(self.target[i], self.clip_base_legs[0]) , self.clip_base_legs[1])
@@ -230,43 +239,72 @@ class Env():
             elif i in self.joint_ids_second_legs:
                 self.target[i] = min(max(self.target[i], self.clip_second_legs[0]) , self.clip_second_legs[1])
 
-    def compute_reward(self, nextState, oldState):
+    def compute_reward(self, nextState,oldState, frames):
+
         won = False
         done = False
         reward = 0
 
-        # distance actuelle et ancienne
-        distance    = math.sqrt(nextState[6]**2 + nextState[7]**2)
-        oldDistance = math.sqrt(oldState[6]**2  + oldState[7]**2)
+        # get base orientation for the flip check
+        self.linkState = p.getLinkState(self.spider,0)
 
-        # signal dense : se rapprocher = positif, s'éloigner = négatif
-        delta = (oldDistance - distance) * 10
-        reward += delta
+        orientation = self.linkState[1]
+        euler = p.getEulerFromQuaternion(orientation)
 
-        # pénalité si il tombe
-        rotationRoll  = nextState[9]
-        rotationPitch = nextState[10]
+        # variable for the fall and flip detection
+        height        = self.linkState[0][2]
+        rotationPitch = euler[1]
+        rotationRoll  = euler[0]
 
-        if abs(rotationRoll) > self.maxRotation or abs(rotationPitch) > self.maxRotation:
-            reward -= 5
+        # --- delta calculation ---
+        # variable for the deplacement detection
+        distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
+        OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
+
+        delta = (OldDistance - distance) * 1
+        
+        # --- pitch/roll/height check ---
+        # reset for high roll
+        if rotationRoll > self.maxRotation or rotationRoll < -self.maxRotation:
+            reward -= self.penaltie
             done = True
 
-        # win
-        if distance < 2.5:
-            reward += 50
-            won = True
+        # reset for high pitch
+        if rotationPitch > self.maxRotation or rotationPitch < -self.maxRotation:  
+            reward -= self.penaltie
+            done = True
+
+        if height < 0.4 :
+            reward -= self.penaltie
+            done = True
+
+        # --- distance check ---
+        if not done :
+
+            reward += delta
+            #print(delta)
+            
+            # win
+            if distance < 2.5 :
+                reward += self.goalReward * 5
+                won = True
+
+
 
         return reward, done, won
+
 # --- PPO ---
 
 # ---[HYPERPARAMETERS]---
-lr = 0.001
+lr_actor  = 0.0003 # not implemented
+lr_critic = 0.0001 # not implemented
+lr = 0.0001
 max_grad_norm = 1.0
 
-clip_epsilon = (0.3) # value of the PPO loss
-gamma = 0.999
+clip_epsilon = (0.2) # value of the PPO loss
+gamma = 0.99
 lmbda = 0.95
-entropy_eps = 0.01
+entropy_eps = 0.001
 
 class ActorCritic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim = 256):
@@ -291,8 +329,8 @@ class ActorCritic(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, hidden_dim // 4 ),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 4, action_dim),
-            nn.Softmax(dim=-1)
+            nn.Linear(hidden_dim // 4, sum(action_dim)),
+            #nn.Softmax(dim=-1)
         )
 
         # 256 hidden neurone -> 128 hidden neurone -> 64 hidden neurone -> 32 hidden neurone -> 1 estimation of how many point the future ia can win
@@ -335,14 +373,14 @@ class buffer:
         mini_batch = self.buffer[0:batch_size]
         return mini_batch
 
-#take subdata and extract info 
+# take subdata and extract info 
 def extract_data_buffer(subdata, dataNumber):
         data = []
         for transcription in subdata:
             data.append(transcription[dataNumber])
 
         return data
- 
+
 def compute_returns(subdata):
     G = 0
     G_t = []
@@ -402,10 +440,20 @@ def PPO_loss(subdata, advantages, model1):
     action_tensor = torch.tensor(action, dtype=torch.int64)
     state_tensor = torch.tensor(states, dtype=torch.float32)  # everything in tensor for the next math
 
-    action_probs, _ = model1(state_tensor)
-    action_dist = torch.distributions.Categorical(action_probs)
 
-    new_log_prob = action_dist.log_prob(action_tensor)
+    # recalculate the log prob
+
+    action_probs, _ = model1(state_tensor)
+    split_action = torch.split(action_probs, nvec, dim=1)
+
+    new_log_prob = torch.zeros(action_tensor.shape[0])
+    for i,groups in enumerate(split_action):
+
+        groupsActionProbalities = softmax(groups)
+        action_dist = torch.distributions.Categorical(groupsActionProbalities)  
+
+        new_log_prob += action_dist.log_prob(action_tensor[:, i])
+
     old_log_prob = torch.tensor(old_log_prob, dtype=torch.float32)
 
     policy_ratio = torch.exp(new_log_prob - old_log_prob)
@@ -414,7 +462,7 @@ def PPO_loss(subdata, advantages, model1):
 
     #print(surrogate_loss_1)
 
-    surrogate_loss_2 = torch.clamp(policy_ratio, 1-clip_epsilon, 1+clip_epsilon) * advantages
+    surrogate_loss_2 = torch.clamp(policy_ratio, 1-clip_epsilon, 1+clip_epsilon) * advantages.detach()
 
     #print(surrogate_loss_2)
 
@@ -428,40 +476,55 @@ def PPO_loss(subdata, advantages, model1):
     return policy_loss
 
 # reset() is link to the ppo | env.reload() is the reset for the agent/environnement
-def reset(episodeLength, episode_count_frames, D_buffer, env, episodes_rewards, current_rewards, graphRewards):
-    episodeLength.append(episode_count_frames)
+def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, graphEpisodeReward):
+    episodeLength.append(len(graphRewards))
     episode_count_frames = 0
-    episodes_rewards.append(current_rewards)
-    current_rewards = []
+    graphEpisodeReward.append(graphRewards)
+    #print(graphEpisodeReward)
+    graphRewards = []
+
     env.reload()
-    """
-    visual.third_Tensor_Graphic(graphRewards,
-                                episodeLength,
-                                episodes_rewards)
-    """
-    return episode_count_frames, current_rewards, episodes_rewards
+
+    return episode_count_frames,graphEpisodeReward,graphRewards
     #print(f"Over {max_training_frames} frames : reset")
 
+def save(name):
+    MODEL_NAME = name
+    MODEL_NAME += ".pth"
+    MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+
+    torch.save(model1.state_dict(), MODEL_SAVE_PATH)
+    print(f"save model : {MODEL_SAVE_PATH}")
 
 def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
     D_buffer = buffer()
     env.reload()
     optimizer = optimizerAdam
 
-    graphRewardMean = []
-
-    episodes_rewards = []
-    current_rewards = []
     graphRewards = []
-    
     episodeLength = []
+    graphValueLoss = []
+    graphPolicyLoss = []
+    graphEpisodeReward = []
 
     Won = 0
 
     total_count_frame = 0
     episode_count_frames = 0
 
-    for i in range (frames_per_batch):   
+    for i in range (frames_per_batch+1):   
+
+
+        ram = psutil.virtual_memory()
+        if ram.percent > 80:
+            print(f"Ram usage (%) : {ram.percent}")
+            print(f"Ram used (GB): {round(ram.used / 1e9, 2)}")
+            print("ram usage overload training close")
+            name = "safeSwitch"
+            save(name)
+            exit()
+
+
         keys = p.getKeyboardEvents()
         if ord('c') in keys:
             print('save')
@@ -472,12 +535,9 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
         # limit episode length
         if episode_count_frames >= max_training_frames:
-            D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                            episode_count_frames,
-                                                                            D_buffer, env, episodes_rewards,
-                                                                            current_rewards, graphRewards)
-
+            #D_buffer.clear_buffer()
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
+        
         # take info
         Data = env.observe()          # data = state = s
 
@@ -488,11 +548,27 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         action_probs, state_value = model1(state_tensor)
         state_value = state_value.detach().item()
 
-        # choose randomly one action while taking the probability
-        action_dist = torch.distributions.Categorical(action_probs)
-        action = action_dist.sample().item()        # action = a
-        #print(action)
+        # 32 output to 12 groups of 3 kinds of inputs
+        split_action = torch.split(action_probs, nvec)
+
+        action = []
+        log_prob = 0
+
+        # for each groups of input
+        for groups in split_action:
+            groupsActionProbalities = softmax(groups)
+            action_dist = torch.distributions.Categorical(groupsActionProbalities)  
+            
+            sample_action = action_dist.sample()
+
+            action.append(sample_action.item()) # action = a
+
+            # use later for the ppo 
+            #(to know at which point the policy what thinking if it was right)
+            log_prob += action_dist.log_prob(sample_action).item()
+
         env.apply_action(action)
+
 
         # update the joint position
         p.setJointMotorControlArray(env.spider,
@@ -502,49 +578,44 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         
         
         focus_position , _ = p.getBasePositionAndOrientation(env.spider)
-            
+        """
         p.resetDebugVisualizerCamera(cameraDistance=15,
                                     cameraYaw=0,
                                     cameraPitch=-40,
                                     cameraTargetPosition = focus_position)
+        """
 
-        p.stepSimulation()
+        for i in range(5):
+            p.stepSimulation()
         #time.sleep(1./240.)
         # --- after action ---
 
-        # use later for the ppo 
-        #(to know at which point the policy what thinking if it was right)
-        log_prob = action_dist.log_prob(torch.tensor(action, dtype=torch.int64)).item()
-
         next_state = env.observe()      # next_state = s'
 
-        reward, done, won = env.compute_reward(next_state,Data)     # reward = r
-        
-        current_rewards.append(reward)
-        graphRewards.append(reward)
-        
+        reward, done, won = env.compute_reward(next_state,Data,episode_count_frames)     # reward = r
 
+        graphRewards.append(reward)
+
+        
         D_buffer.store_buffer(Data, action, reward, next_state, done, state_value, log_prob)
         if done:
             #D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                episode_count_frames,
-                                                                D_buffer, env, episodes_rewards,
-                                                                current_rewards, graphRewards)
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
 
         elif won:
             #D_buffer.clear_buffer()
-            episode_count_frames, current_rewards, episodes_rewards = reset(episodeLength,
-                                                                            episode_count_frames,
-                                                                            D_buffer, env, episodes_rewards,
-                                                                            current_rewards, graphRewards)
+            episode_count_frames, graphEpisodeReward,graphRewards = reset(episodeLength,episode_count_frames, D_buffer, env, graphRewards,graphEpisodeReward)
+
             Won += 1
             print(" - - DONE - - ")
+
+        #print(f"reward : {reward}")
+        #print(f"episode reward : {graphEpisodeReward}")
 
         # learning loop
         if len(D_buffer.buffer) >= buffer_Collect_Size :
             print("ppo")
-            subdata = D_buffer.sample(sub_batch_size)
+            subdata = D_buffer.return_buffer()
 
             # calculate the amount of reward the model should get
             # use to compare the model thus to update the model
@@ -568,11 +639,13 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
                     # calculate the loss of the policy for the actor
                     policy_loss =  PPO_loss(mini_batch, advantages_batch, model1)
+                    graphPolicyLoss.append(policy_loss) # only for the graph
 
                     # calculate the loss of the policy for the critic
                     value_loss = compute_value_loss(mini_batch, returns_batch, model1)
+                    graphValueLoss.append(value_loss) # only for the graph
 
-                    loss = policy_loss + value_loss 
+                    loss = policy_loss + value_loss * 0.5
                     #print(loss)
                     
                     loss.backward()
@@ -594,18 +667,40 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         #p.stepSimulation()
         #time.sleep(1./240.)
     print(f"Number of Finish Episode : {Won}")
-    #print(episodeLength)
-    
-    visual.third_Tensor_Graphic(graphRewards,
-                                episodeLength,
-                                episodes_rewards)
-    graphRewardMean = []
 
-    episodes_rewards = []
-    current_rewards = []
-    graphRewards = []
+    #graphRewards         = [round(num, 3) for num in graphRewards]
+    episodeLength        = [round(num, 3) for num in episodeLength]
+
+    numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().tolist()
+    numpyGraphPolicyLoss = [round(num, 3) for num in numpyGraphPolicyLoss]
+
+    numpyGraphValueLoss  = torch.stack(graphValueLoss).cpu().detach().tolist()
+    numpyGraphValueLoss  = [round(num, 3) for num in numpyGraphValueLoss]
+
+
+
+    with open("save.txt", "a") as saveFile:
+
+        saveFile.write("----\n")
+
+        #saveFile.write(f"{graphRewards}\n")
+        saveFile.write(f"{episodeLength}\n")
+        saveFile.write(f"{numpyGraphPolicyLoss}\n")
+        saveFile.write(f"{numpyGraphValueLoss}\n")
+        saveFile.write(f"{graphEpisodeReward}\n")
+        saveFile.write(f"{num_epochs}\n")
+
+    #saveFile.close()
     
+    import graph
+
+    # reset all variable for the next training
+
+    graphRewards = []
     episodeLength = []
+    graphValueLoss = []
+    graphPolicyLoss = []
+    graphEpisodeReward = []
 
     Won = 0
 
@@ -637,39 +732,46 @@ def DEBUG(env):
         print(f"{jupper} -> {jupperDegree}")
         print()
 
+
     while True:
         
         
         keys = p.getKeyboardEvents()
 
+        action = [1] * 12
+
         if ord('x') in keys:
             env.reload()
             
+        if ord('r') in keys :
+            action = [0 ,1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1]
 
-        if ord('e') in keys :
-            env.apply_action(1)
-            env.apply_action(4)  
-            env.apply_action(7)  
-            env.apply_action(10)      
+        if ord('f') in keys :
+            action = [2 ,1, 1, 2, 1, 1, 2, 1, 1, 2, 1, 1]
 
-        if ord('d') in keys :
-            env.apply_action(13)
-            env.apply_action(16)  
-            env.apply_action(19)  
-            env.apply_action(22)    
 
         if ord('o') in keys : 
-            cameraPitch += 0.2
+            action = [1 ,0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1]
         
         if ord('l') in keys : 
-            cameraPitch -= 0.2
+            action = [1 ,2, 1, 1, 2, 1, 1, 2, 1, 1, 2, 1]
 
-        if ord('f') in keys:
+
+        if ord('e') in keys : 
+            action = [1 ,1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0]
+        
+        if ord('d') in keys : 
+            action = [1 ,1, 2, 1, 1, 2, 1, 1, 2, 1, 1, 2]
+
+        
+        if ord('b') in keys:
             linkState = p.getLinkState(env.spider,0)
             print()
             for i in range(4):
                 print(i)
                 print(round(linkState[1][i],2))
+        
+        env.apply_action(action)
 
         linkState = p.getLinkState(env.spider,0)
 
@@ -681,9 +783,9 @@ def DEBUG(env):
             height_penalty = -abs(minHeight - height) * 3
 
         euler = p.getEulerFromQuaternion(orientation)
-        #print(f"roll  : {round(radian(euler[1]), 1)}")
-        #print(f"pitch : {round(radian(euler[0]), 1)}")
-        #print(f"yaw   : {round(radian(euler[2]), 1)}")
+        print(f"roll  : {round(radian(euler[1]), 1)}")
+        print(f"pitch : {round(radian(euler[0]), 1)}")
+        print(f"yaw   : {round(radian(euler[2]), 1)}")
         """
         if linkState[0][2] > 0.5 and linkState[0][2] < 0.8 :
             print(linkState[0][2])
@@ -708,22 +810,23 @@ def DEBUG(env):
         time.sleep(1./240.)
 
 
+# 3 * 12 action | ia choose for each joint if it wants to go increase, decrease the joint angle or do nothing
+nvec = [3] * 12
 
-model1 = ActorCritic(state_dim=38, action_dim=24)
+softmax = nn.Softmax(dim=-1)
+model1 = ActorCritic(state_dim=38, action_dim=nvec)
 optimizerAdam = optim.Adam(model1.parameters(), lr=lr)
 env1 = Env()
 
 #env2 = Env()
 """
-frames_per_batch = 131720
-buffer_Collect_Size = 8192
-num_epochs = 15
-sub_batch_size = 512
-max_training_frames = 8192
-training(frames_per_batch, sub_batch_size, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
-training(frames_per_batch, sub_batch_size, model1, max_training_frames, env2, buffer_Collect_Size, num_epochs)
+frames_per_batch = 15000
+buffer_Collect_Size = 1500
+num_epochs = 10
+sub_batch_size = 750
+max_training_frames = 3000
+training(frames_per_batch, sub_batch_size,optimizerAdam, model1, max_training_frames, env1, buffer_Collect_Size, num_epochs)
 """
-
 while True:
     print("\n[0] Exit | Train [1] | Load [2] | DEBUG [3] | multi [4] ")
     
@@ -745,11 +848,11 @@ while True:
     # train
     elif QuestionAction == 1:
 
-        frames_per_batch = 131720
-        buffer_Collect_Size = 4096
-        num_epochs = 15
-        sub_batch_size = 512
-        max_training_frames = 8192
+        frames_per_batch = 1_000_000
+        buffer_Collect_Size = 8196
+        num_epochs = 8
+        sub_batch_size = 4096
+        max_training_frames = 5000
 
         print("\nGo for training")
 
