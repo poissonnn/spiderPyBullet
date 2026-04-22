@@ -67,7 +67,7 @@
     </inertial>
     <!-- Part arm1 -->
     <visual>
-      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
       <geometry>
         <mesh filename="package://speeder_description/assets/arm1.stl"/>
       </geometry>
@@ -76,7 +76,7 @@
       </material>
     </visual>
     <collision>
-      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 0"/>
+      <origin xyz="0.0211943 0.015 -0.00518933" rpy="1.5708 -0 -0"/>
       <geometry>
         <mesh filename="package://speeder_description/assets/arm1.stl"/>
       </geometry>
@@ -108,7 +108,7 @@
   </link>
   <!-- Joint from first_leg_1 to second_leg_1 -->
   <joint name="second_leg_1" type="revolute">
-    <origin xyz="-0 -0.05 0.010036" rpy="-3.14159 -0 -1.8326"/>
+    <origin xyz="-0 -0.05 0.010036" rpy="-3.14159 0 -1.8326"/>
     <parent link="first_leg_1"/>
     <child link="second_leg_1"/>
     <axis xyz="0 0 1"/>
@@ -116,7 +116,7 @@
   </joint>
   <!-- Joint from base_arm to first_leg_1 -->
   <joint name="first_leg_1" type="revolute">
-    <origin xyz="0 0.005 -0.015" rpy="1.5708 -1.39626 -0"/>
+    <origin xyz="-0 0.005 -0.015" rpy="1.5708 -1.39626 -0"/>
     <parent link="base_arm"/>
     <child link="first_leg_1"/>
     <axis xyz="0 0 1"/>
@@ -124,11 +124,11 @@
   </joint>
   <!-- Joint from body to base_arm -->
   <joint name="base_leg_1" type="revolute">
-    <origin xyz="-0.015 -0.0225 0.0025" rpy="-3.14159 0 -2.35619"/>
+    <origin xyz="-0.015 -0.0225 0.0025" rpy="-3.14159 -0 -2.35619"/>
     <parent link="body"/>
     <child link="base_arm"/>
     <axis xyz="0 0 1"/>
-    <limit effort="10" velocity="10" lower="-1.5708" upper="1.5708"/>
+    <limit effort="10" velocity="10" lower="-1.39626" upper="1.39626"/>
   </joint>
   <!-- Link base_arm_2 -->
   <link name="base_arm_2">
