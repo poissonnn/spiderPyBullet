@@ -144,7 +144,7 @@ def Reward(allGraphRewards, window = 20):
         
     ax.plot(range(len(smoothMean)), smoothMean, color = black, zorder = zorder, alpha = alpha,linewidth = linewidth)
     # x values, y lower values, y upper values
-    #ax.fill_between(range(len(smoothMean)), smoothMin, smoothMax, color = blue_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
+    ax.fill_between(range(len(smoothMean)), smoothMin, smoothMax, color = blue_light, alpha = alpha/4, interpolate = True,zorder = zorder-3)
 
 
     ax.axhline(0, color = true_black, linestyle = (0,(2,2.5)), linewidth = 1.5, alpha = alpha)

@@ -45,7 +45,7 @@ class Env():
         self.stepMouvement = 0.02
         self.maxAcceptRotation = 0.2
         self.maxRotation = 0.8
-        self.penaltie = 1
+        self.penaltie = 0.2
         self.goalReward = 0.5
         self.checkpoint = 0
         self.checkpointMultiplier = 1
@@ -261,7 +261,7 @@ class Env():
         distance = math.sqrt(nextState[6]**2 + nextState[7]**2)
         OldDistance = math.sqrt(oldState[6]**2 + oldState[7]**2)
 
-        delta = (OldDistance - distance) * 1
+        delta = (OldDistance - distance) * 10
         
         # --- pitch/roll/height check ---
         # reset for high roll
@@ -277,6 +277,10 @@ class Env():
         if height < 0.4 :
             reward -= self.penaltie
             done = True
+        else : 
+            #reward += frames * 0.001
+            pass
+
 
         # --- distance check ---
         if not done :
@@ -488,13 +492,30 @@ def reset(episodeLength, episode_count_frames, D_buffer, env, graphRewards, grap
     return episode_count_frames,graphEpisodeReward,graphRewards
     #print(f"Over {max_training_frames} frames : reset")
 
-def save(name):
-    MODEL_NAME = name
-    MODEL_NAME += ".pth"
-    MODEL_SAVE_PATH = os.path.join(path, MODEL_NAME)
+def save(name,episodeLength, graphPolicyLoss, graphValueLoss,graphEpisodeReward, num_epochs):
+    #graphRewards         = [round(num, 3) for num in graphRewards]
+    episodeLength        = [round(num, 3) for num in episodeLength]
 
-    torch.save(model1.state_dict(), MODEL_SAVE_PATH)
-    print(f"save model : {MODEL_SAVE_PATH}")
+    numpyGraphPolicyLoss = torch.stack(graphPolicyLoss).cpu().detach().tolist()
+    numpyGraphPolicyLoss = [round(num, 3) for num in numpyGraphPolicyLoss]
+
+    numpyGraphValueLoss  = torch.stack(graphValueLoss).cpu().detach().tolist()
+    numpyGraphValueLoss  = [round(num, 3) for num in numpyGraphValueLoss]
+
+    with open("save.txt", "a") as saveFile:
+
+        saveFile.write("----\n")
+
+        #saveFile.write(f"{graphRewards}\n")
+        saveFile.write(f"{episodeLength}\n")
+        saveFile.write(f"{numpyGraphPolicyLoss}\n")
+        saveFile.write(f"{numpyGraphValueLoss}\n")
+        saveFile.write(f"{graphEpisodeReward}\n")
+        saveFile.write(f"{num_epochs}\n")
+
+    #saveFile.close()
+    
+    import graph
 
 def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_training_frames, env, buffer_Collect_Size, num_epochs):
     D_buffer = buffer()
@@ -516,18 +537,22 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
 
 
         ram = psutil.virtual_memory()
-        if ram.percent > 80:
+        if ram.percent > 95:
             print(f"Ram usage (%) : {ram.percent}")
             print(f"Ram used (GB): {round(ram.used / 1e9, 2)}")
             print("ram usage overload training close")
             name = "safeSwitch"
-            save(name)
-            exit()
+
+            save(name, episodeLength, graphPolicyLoss, graphValueLoss, graphEpisodeReward, num_epochs)
+            break
 
 
         keys = p.getKeyboardEvents()
+
         if ord('c') in keys:
             print('save')
+            name = "Tempo"
+            save(name, episodeLength, graphPolicyLoss, graphValueLoss, graphEpisodeReward, num_epochs)
             break
     
         if ord('x') in keys:
@@ -662,12 +687,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         if total_count_frame % max_training_frames*2 == 0:
             print(f"frame count : {total_count_frame}")
             
-
-
-        #p.stepSimulation()
-        #time.sleep(1./240.)
     print(f"Number of Finish Episode : {Won}")
-
+    """
     #graphRewards         = [round(num, 3) for num in graphRewards]
     episodeLength        = [round(num, 3) for num in episodeLength]
 
@@ -689,11 +710,8 @@ def training(frames_per_batch, sub_batch_size, optimizerAdam, model1, max_traini
         saveFile.write(f"{numpyGraphValueLoss}\n")
         saveFile.write(f"{graphEpisodeReward}\n")
         saveFile.write(f"{num_epochs}\n")
-
-    #saveFile.close()
-    
     import graph
-
+    """
     # reset all variable for the next training
 
     graphRewards = []
